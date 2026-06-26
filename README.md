@@ -1,4 +1,5 @@
-# IntelliCivic – Implementation Flow (Non-Technical)
+# IntelliCivic (Community Hero - Hyperlocal Problem Solver)
+Implementation Flow (Non-Technical)
 
 This section explains, in simple terms, how the whole system works for citizens and admins.
 
