@@ -12,7 +12,7 @@ This section explains, in simple terms, how the whole system works for citizens 
 
 ## How login with Aadhaar + OTP works
 
-1. You enter your 12‑digit Aadhaar number and tap Send OTP.
+1. You enter your 10‑digit Phone number and tap Send OTP.
 2. The system sends a 6‑digit OTP and starts a short timer.
 3. You enter the OTP and tap Verify; if it matches and is on time, you’re signed in.
 
