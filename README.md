@@ -29,8 +29,8 @@ This section explains, in simple terms, how the whole system works for citizens 
 
 ## Key benefits
 
-- Easy sign‑in with Aadhaar + OTP (no passwords to remember).
+- Easy sign‑in with Phone Number + OTP (no passwords to remember).
 - Quick registration with automatic address fill from your location.
 - Clear status tracking for reported issues.
 
-# Civic
+
