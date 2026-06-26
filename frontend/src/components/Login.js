@@ -101,10 +101,10 @@ const Login = ({ setUser, setIsAdmin }) => {
         token: response.data.token
       };
       setUser(user);
-      localStorage.setItem('civicconnect_user', JSON.stringify(user));
-      localStorage.setItem('civicconnect_token', response.data.token);
+      localStorage.setItem('intellicivic_user', JSON.stringify(user));
+      localStorage.setItem('intellicivic_token', response.data.token);
       // Ensure admin session is cleared so citizen routes are accessible
-      try { localStorage.removeItem('civicconnect_admin'); } catch (_) {}
+      try { localStorage.removeItem('intellicivic_admin'); } catch (_) {}
       if (typeof setIsAdmin === 'function') {
         setIsAdmin(false);
       }

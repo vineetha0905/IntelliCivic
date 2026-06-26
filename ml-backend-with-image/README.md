@@ -1,4 +1,4 @@
-Civic ML Backend (Full: pHash + Location)
+IntelliCivic ML Backend (Full: pHash + Location)
 
 Overview:
 

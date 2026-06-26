@@ -1,7 +1,7 @@
 {
-  "name": "civicconnect-backend",
+  "name": "intellicivic-backend",
   "version": "1.0.0",
-  "description": "Backend API for CivicConnect - A civic issue reporting platform",
+  "description": "Backend API for IntelliCivic - A civic issue reporting platform",
   "main": "server.js",
   "scripts": {
     "start": "node server.js",
@@ -20,7 +20,7 @@
     "express",
     "mongodb"
   ],
-  "author": "CivicConnect Team",
+  "author": "IntelliCivic Team",
   "license": "MIT",
   "dependencies": {
     "bcryptjs": "^2.4.3",

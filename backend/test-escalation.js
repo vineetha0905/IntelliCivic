@@ -11,7 +11,7 @@ const escalationService = require('./src/services/escalationService');
 async function testEscalation() {
   try {
     // Connect to database
-    await mongoose.connect(process.env.MONGODB_URI || 'mongodb://localhost:27017/civic_connect');
+    await mongoose.connect(process.env.MONGODB_URI || 'mongodb://localhost:27017/intellicivic');
     console.log('Connected to database');
 
     // Check for any existing issues that might be ready for escalation

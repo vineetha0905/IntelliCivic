@@ -1,7 +1,7 @@
 {
   "expo": {
-    "name": "CivicConnect",
-    "slug": "civicconnect-mobile",
+    "name": "IntelliCivic",
+    "slug": "intellicivic-mobile",
     "version": "1.0.0",
     "orientation": "portrait",
     "icon": "./assets/icon.png",
@@ -16,14 +16,14 @@
     ],
     "ios": {
       "supportsTablet": true,
-      "bundleIdentifier": "com.civicconnect.app"
+      "bundleIdentifier": "com.intellicivic.app"
     },
     "android": {
       "adaptiveIcon": {
         "foregroundImage": "./assets/adaptive-icon.png",
         "backgroundColor": "#1e4359"
       },
-      "package": "com.civicconnect.app"
+      "package": "com.intellicivic.app"
     },
     "web": {
       "favicon": "./assets/favicon.png"
@@ -32,13 +32,13 @@
       [
         "expo-location",
         {
-          "locationAlwaysAndWhenInUsePermission": "Allow CivicConnect to use your location to show nearby issues."
+          "locationAlwaysAndWhenInUsePermission": "Allow IntelliCivic to use your location to show nearby issues."
         }
       ],
       [
         "expo-image-picker",
         {
-          "photosPermission": "Allow CivicConnect to access your photos to attach images to issue reports."
+          "photosPermission": "Allow IntelliCivic to access your photos to attach images to issue reports."
         }
       ]
     ]

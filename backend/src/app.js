@@ -137,7 +137,7 @@ app.use('/uploads', express.static('uploads'));
 app.get('/health', (req, res) => {
   res.json({
     success: true,
-    message: 'CivicConnect API is running',
+    message: 'IntelliCivic API is running',
     timestamp: new Date().toISOString(),
     environment: process.env.NODE_ENV || 'development'
   });
@@ -155,7 +155,7 @@ app.use('/api/notifications', notificationRoutes);
 app.get('/', (req, res) => {
   res.json({
     success: true,
-    message: 'Welcome to CivicConnect API',
+    message: 'Welcome to IntelliCivic API',
     version: '1.0.0',
     documentation: '/api/docs',
     endpoints: {

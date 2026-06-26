@@ -23,6 +23,21 @@ const ReportIssue = ({ user }) => {
   const targetRef = useRef('description');
   const lastTranscriptTitleRef = useRef('');
   const lastTranscriptDescRef = useRef('');
+  
+  // AI states
+  const [aiAnalysis, setAiAnalysis] = useState(null);
+  const [duplicateCheck, setDuplicateCheck] = useState(null);
+  const [showAiModal, setShowAiModal] = useState(false);
+  const [isAnalyzing, setIsAnalyzing] = useState(false);
+
+  const fileToBase64 = (file) => {
+    return new Promise((resolve, reject) => {
+      const reader = new FileReader();
+      reader.readAsDataURL(file);
+      reader.onload = () => resolve(reader.result);
+      reader.onerror = error => reject(error);
+    });
+  };
 
   // Check if speech recognition is available on mount
   useEffect(() => {
@@ -273,95 +288,139 @@ const ReportIssue = ({ user }) => {
     );
     
     // Clear watch after 20 seconds
-    setTimeout(() => {
+      setTimeout(() => {
       navigator.geolocation.clearWatch(watchId);
     }, 20000);
   };
 
-  const handleSubmit = async (e) => {
+  const handlePreSubmit = async (e) => {
     e.preventDefault();
-    setIsSubmitting(true);
+    
+    // Validate required fields
+    if (!reportData.coordinates || !reportData.coordinates[0] || !reportData.coordinates[1]) {
+      toast.error('Please get your location first');
+      return;
+    }
 
-    let issueData = null; // Declare issueData in the outer scope
+    if (reportData.title.length < 5) {
+      toast.warning('Title must be at least 5 characters long');
+      return;
+    }
+
+    if (reportData.description.length < 10) {
+      toast.warning('Description must be at least 10 characters long');
+      return;
+    }
+
+    setIsAnalyzing(true);
+    try {
+      let imageBase64 = null;
+      if (selectedFile) {
+        imageBase64 = await fileToBase64(selectedFile);
+      }
+
+      // Call analyze API
+      const analysisResult = await apiService.analyzeIssue({
+        description: reportData.description,
+        imageBase64
+      });
+
+      if (!analysisResult.success || !analysisResult.data) {
+        throw new Error('AI analysis failed. Please try again.');
+      }
+
+      const parsedAnalysis = analysisResult.data;
+      
+      // Validate image relevance
+      if (parsedAnalysis.image_relevant === false) {
+        const relevanceReason = parsedAnalysis.image_relevance_reason || '';
+        if (relevanceReason.includes('Image does not match')) {
+          toast.error('Image does not match the selected category, issue title, or complaint description. Please upload a relevant image or update the complaint details.');
+        } else if (relevanceReason.includes('Abusive language detected')) {
+          toast.error('Abusive language detected. Please remove inappropriate words before submitting your complaint.');
+        } else {
+          toast.error(relevanceReason || 'The image is not relevant to the issue.');
+        }
+        setIsAnalyzing(false);
+        return;
+      }
+
+      setAiAnalysis(parsedAnalysis);
+
+      // Check duplicates
+      const dupResult = await apiService.checkDuplicate({
+        description: reportData.description,
+        category: parsedAnalysis.category,
+        locationName: reportData.location,
+        coordinates: {
+          latitude: reportData.coordinates[0],
+          longitude: reportData.coordinates[1]
+        },
+        imageBase64
+      });
+
+      setDuplicateCheck(dupResult.data || { duplicate: false });
+      setShowAiModal(true);
+    } catch (err) {
+      console.error('Pre-submission check failed:', err);
+      if (err.message.includes('Abusive language detected')) {
+        toast.error('Abusive language detected. Please remove inappropriate words before submitting your complaint.');
+        setIsAnalyzing(false);
+        return;
+      }
+      if (err.message.includes('Image does not match')) {
+        toast.error('Image does not match the selected category, issue title, or complaint description. Please upload a relevant image or update the complaint details.');
+        setIsAnalyzing(false);
+        return;
+      }
+      toast.error(`Analysis error: ${err.message}. Proceeding to manual confirmation.`);
+      // Proceed with defaults if analysis completely fails
+      setAiAnalysis({
+        category: 'Other',
+        priority: 'Medium',
+        department: 'Public Works',
+        summary: reportData.description.slice(0, 100),
+        recommended_action: 'Manual inspection',
+        urgency_reason: 'Analysis unavailable'
+      });
+      setDuplicateCheck({ duplicate: false });
+      setShowAiModal(true);
+    } finally {
+      setIsAnalyzing(false);
+    }
+  };
+
+  const executeSubmit = async () => {
+    setIsSubmitting(true);
+    setShowAiModal(false);
+
+    let issueData = null;
 
     try {
-      // Validate required fields
-      if (!reportData.coordinates || !reportData.coordinates[0] || !reportData.coordinates[1]) {
-        toast.error('Please get your location first');
-        setIsSubmitting(false);
-        return;
-      }
-
-      // Validate field lengths
-      if (reportData.title.length < 5) {
-        toast.warning('Title must be at least 5 characters long');
-        setIsSubmitting(false);
-        return;
-      }
-
-      if (reportData.description.length < 10) {
-        toast.warning('Description must be at least 10 characters long');
-        setIsSubmitting(false);
-        return;
-      }
-
-      // Debug: Log the data being sent
-      console.log('User data:', user);
-      
-      // 1) Validate with ML backend first (category will be auto-detected)
-      // Send image file directly to ML backend (NOT uploaded to Cloudinary yet)
-      const mlPayload = {
-        report_id: `${Date.now()}`,
-        description: reportData.description,
-        user_id: user?._id || user?.id || 'anon',
-        latitude: reportData.coordinates[0],
-        longitude: reportData.coordinates[1]
-      };
-
-      // ML validation is now completely non-blocking with 45 second timeout and retries
-      // If it times out or fails after retries, we proceed with default category
-      let mlResult = null;
-      try {
-        // 45 second timeout with 2 retries to handle Render cold starts
-        // Pass selectedFile directly to ML backend
-        mlResult = await apiService.validateReportWithML(mlPayload, selectedFile, 45000, 2);
-        console.log('ML validation result:', mlResult);
-      } catch (mlError) {
-        // This should rarely happen now since validateReportWithML returns null instead of throwing
-        console.warn('ML validation error (non-blocking):', mlError.message);
-        mlResult = null;
-      }
-      
-      // Only check for explicit rejections from ML backend
-      if (mlResult && mlResult.accept === false && mlResult.status === 'rejected') {
-        setIsSubmitting(false);
-        const reason = mlResult.reason || 'Report rejected by validator';
-        toast.error(`Report rejected: ${reason}`);
-        return;
-      }
-      
-      // 2) Upload image to Cloudinary ONLY IF ML accepted the report
+      // 1) Upload image to Cloudinary if available
       let imageUrl = null;
       let uploadedPublicId = null;
       
-      if (selectedFile && mlResult && mlResult.accept === true) {
+      if (selectedFile) {
         try {
           const uploadResponse = await apiService.uploadImage(selectedFile);
-          // Support both our backend shape { success, data: { url, publicId } }
-          // and any direct shape { url, secure_url, public_id }
           const uploaded = uploadResponse?.data || uploadResponse || {};
           imageUrl = uploaded.url || uploaded.secure_url || null;
           uploadedPublicId = uploaded.publicId || uploaded.public_id || null;
         } catch (uploadError) {
           console.warn('Image upload failed, continuing without image:', uploadError);
-          // Continue without image if upload fails
         }
       }
 
-      // Prepare issue data (category will be auto-detected by ML backend)
+      // Map priority to valid enum values: ['low', 'medium', 'high', 'urgent', 'critical']
+      const finalPriority = (aiAnalysis?.priority || 'medium').toLowerCase();
+
+      // Prepare issue data
       issueData = {
         title: reportData.title,
         description: reportData.description,
+        category: aiAnalysis?.category || 'Other',
+        priority: ['low', 'medium', 'high', 'urgent', 'critical'].includes(finalPriority) ? finalPriority : 'medium',
         location: {
           name: reportData.location,
           coordinates: {
@@ -373,36 +432,19 @@ const ReportIssue = ({ user }) => {
           url: imageUrl,
           publicId: uploadedPublicId || imageUrl.split('/').pop(),
           caption: 'Issue image'
-        }] : []
+        }] : [],
+        aiAnalysis: {
+          category: aiAnalysis?.category || 'Other',
+          priority: aiAnalysis?.priority || 'Medium',
+          department: aiAnalysis?.department || 'Public Works',
+          summary: aiAnalysis?.summary || reportData.description.slice(0, 100),
+          recommendedAction: aiAnalysis?.recommended_action || 'Inspect',
+          urgencyReason: aiAnalysis?.urgency_reason || ''
+        }
       };
 
-      // Use ML-detected category if available, otherwise use default
-      if (mlResult && mlResult.category) {
-        issueData.category = mlResult.category;
-        console.log('Using ML-detected category:', mlResult.category);
-      } else {
-        // Default category if ML validation failed or timed out
-        if (!issueData.category) {
-          issueData.category = 'Other';
-        }
-        // Only show warning if ML was attempted but failed (not if it was skipped)
-        if (mlResult === null) {
-          console.log('ML validation skipped (timeout/unavailable), using default category');
-        }
-      }
-
-      // Optionally map ML urgency to backend priority if provided
-      if (mlResult && mlResult.urgency) {
-        issueData.priority = mlResult.urgency;
-      }
-
-      // Ensure priority is set if not provided
-      if (!issueData.priority) {
-        issueData.priority = 'medium'; // Default priority
-      }
-
-      // 3) Submit to backend only if accepted
-      const response = await apiService.createIssue(issueData);
+      // Submit to backend
+      await apiService.createIssue(issueData);
       
       setIsSubmitting(false);
       toast.success('Issue reported successfully!');
@@ -410,8 +452,30 @@ const ReportIssue = ({ user }) => {
     } catch (error) {
       setIsSubmitting(false);
       console.error('Issue creation error:', error);
-      console.error('Issue data sent:', issueData);
+      if (error.message.includes('Abusive language detected')) {
+        toast.error('Abusive language detected. Please remove inappropriate words before submitting your complaint.');
+      } else if (error.message.includes('Image does not match')) {
+        toast.error('Image does not match the selected category, issue title, or complaint description. Please upload a relevant image or update the complaint details.');
+      } else {
+        toast.error(`Error: ${error.message}`);
+      }
+    }
+  };
+
+  const handleSupportExisting = async (dupId) => {
+    try {
+      setIsSubmitting(true);
+      await apiService.upvoteIssue(dupId);
+      await apiService.verifyIssue(dupId, { status: 'verified', comment: 'Supported duplicate report' });
+      
+      toast.success('Supported existing issue successfully! +8 Points Awarded.');
+      setShowAiModal(false);
+      setIsSubmitting(false);
+      navigate('/citizen');
+    } catch (error) {
+      console.error('Error supporting duplicate issue:', error);
       toast.error(`Error: ${error.message}`);
+      setIsSubmitting(false);
     }
   };
 
@@ -527,7 +591,7 @@ const ReportIssue = ({ user }) => {
           {/* Voice panel removed as requested; mic remains near Description */}
         </div>
 
-        <form onSubmit={handleSubmit} className="login-form">
+        <form onSubmit={handlePreSubmit} className="login-form">
           <div className="form-group">
             <label className="form-label">Issue Title</label>
             <div className="form-row-inline" style={{ display: 'flex', gap: '0.5rem', alignItems: 'center' }}>
@@ -614,12 +678,289 @@ const ReportIssue = ({ user }) => {
           <button 
             type="submit" 
             className="btn-primary" 
-            disabled={isSubmitting}
+            disabled={isSubmitting || isAnalyzing}
           >
             {isSubmitting ? 'Submitting...' : 'Submit Report'}
           </button>
         </form>
       </div>
+
+      {/* AI Analysis and Duplicate Check Modal */}
+      {showAiModal && (
+        <div style={{
+          position: 'fixed',
+          top: 0,
+          left: 0,
+          width: '100%',
+          height: '100%',
+          backgroundColor: 'rgba(15, 23, 42, 0.75)',
+          backdropFilter: 'blur(8px)',
+          display: 'flex',
+          justifyContent: 'center',
+          alignItems: 'center',
+          zIndex: 1000,
+          padding: '1rem',
+          boxSizing: 'border-box'
+        }}>
+          <div style={{
+            background: 'rgba(255, 255, 255, 0.95)',
+            border: '1px solid rgba(255, 255, 255, 0.3)',
+            borderRadius: '16px',
+            maxWidth: '550px',
+            width: '100%',
+            maxHeight: '90vh',
+            overflowY: 'auto',
+            padding: '2rem',
+            boxShadow: '0 25px 50px -12px rgba(0, 0, 0, 0.25)',
+            display: 'flex',
+            flexDirection: 'column',
+            gap: '1.5rem'
+          }}>
+            <div style={{ display: 'flex', alignItems: 'center', gap: '0.75rem' }}>
+              <div style={{
+                background: '#1e4359',
+                color: 'white',
+                padding: '0.5rem',
+                borderRadius: '8px'
+              }}>
+                ✨
+              </div>
+              <h2 style={{ fontSize: '1.5rem', fontWeight: '700', color: '#1e293b', margin: 0 }}>
+                Gemini AI Analysis Report
+              </h2>
+            </div>
+
+            {/* Analysis details */}
+            <div style={{ background: '#f8fafc', padding: '1.25rem', borderRadius: '12px', display: 'flex', flexDirection: 'column', gap: '0.75rem' }}>
+              <div>
+                <span style={{ fontSize: '0.75rem', textTransform: 'uppercase', letterSpacing: '0.05em', color: '#64748b', fontWeight: '600' }}>Detected Category</span>
+                <div style={{ display: 'flex', gap: '0.5rem', marginTop: '0.25rem' }}>
+                  <span style={{ background: '#dbeafe', color: '#1e40af', padding: '0.25rem 0.75rem', borderRadius: '9999px', fontSize: '0.875rem', fontWeight: '600' }}>
+                    {aiAnalysis?.category}
+                  </span>
+                </div>
+              </div>
+
+              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '1rem' }}>
+                <div>
+                  <span style={{ fontSize: '0.75rem', textTransform: 'uppercase', letterSpacing: '0.05em', color: '#64748b', fontWeight: '600' }}>Priority</span>
+                  <div style={{ marginTop: '0.25rem' }}>
+                    <span style={{
+                      background: aiAnalysis?.priority?.toLowerCase() === 'critical' ? '#fee2e2' :
+                                  aiAnalysis?.priority?.toLowerCase() === 'high' ? '#ffedd5' :
+                                  aiAnalysis?.priority?.toLowerCase() === 'medium' ? '#eff6ff' : '#f1f5f9',
+                      color: aiAnalysis?.priority?.toLowerCase() === 'critical' ? '#991b1b' :
+                             aiAnalysis?.priority?.toLowerCase() === 'high' ? '#9a3412' :
+                             aiAnalysis?.priority?.toLowerCase() === 'medium' ? '#1e40af' : '#334155',
+                      padding: '0.25rem 0.75rem',
+                      borderRadius: '9999px',
+                      fontSize: '0.875rem',
+                      fontWeight: '600'
+                    }}>
+                      {aiAnalysis?.priority}
+                    </span>
+                  </div>
+                </div>
+
+                <div>
+                  <span style={{ fontSize: '0.75rem', textTransform: 'uppercase', letterSpacing: '0.05em', color: '#64748b', fontWeight: '600' }}>Assigned Department</span>
+                  <div style={{ marginTop: '0.25rem', fontSize: '0.875rem', fontWeight: '600', color: '#334155' }}>
+                    🏢 {aiAnalysis?.department}
+                  </div>
+                </div>
+              </div>
+
+              <div>
+                <span style={{ fontSize: '0.75rem', textTransform: 'uppercase', letterSpacing: '0.05em', color: '#64748b', fontWeight: '600' }}>AI Summary</span>
+                <p style={{ margin: '0.25rem 0 0 0', fontSize: '0.925rem', color: '#334155', lineHeight: '1.5' }}>
+                  {aiAnalysis?.summary}
+                </p>
+              </div>
+
+              <div>
+                <span style={{ fontSize: '0.75rem', textTransform: 'uppercase', letterSpacing: '0.05em', color: '#64748b', fontWeight: '600' }}>Urgency Justification</span>
+                <p style={{ margin: '0.25rem 0 0 0', fontSize: '0.875rem', color: '#475569', fontStyle: 'italic', lineHeight: '1.4' }}>
+                  "{aiAnalysis?.urgency_reason}"
+                </p>
+              </div>
+
+              <div>
+                <span style={{ fontSize: '0.75rem', textTransform: 'uppercase', letterSpacing: '0.05em', color: '#64748b', fontWeight: '600' }}>Recommended Resolution Action</span>
+                <p style={{ margin: '0.25rem 0 0 0', fontSize: '0.875rem', color: '#334155', fontWeight: '500' }}>
+                  🔧 {aiAnalysis?.recommended_action}
+                </p>
+              </div>
+            </div>
+
+            {/* Smart duplicate checker warnings */}
+            {duplicateCheck?.duplicate ? (
+              <div style={{
+                background: '#fff7ed',
+                border: '1px solid #fed7aa',
+                borderRadius: '12px',
+                padding: '1.25rem',
+                display: 'flex',
+                flexDirection: 'column',
+                gap: '0.75rem'
+              }}>
+                <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', color: '#c2410c', fontWeight: '700' }}>
+                  ⚠️ Duplicate Detected nearby ({duplicateCheck.confidence}% confidence)
+                </div>
+                <p style={{ margin: 0, fontSize: '0.875rem', color: '#7c2d12', lineHeight: '1.4' }}>
+                  {duplicateCheck.reason}
+                </p>
+                <div style={{ fontSize: '0.875rem', color: '#9a3412', fontWeight: '600' }}>
+                  "Similar issue already reported nearby. Support the existing issue instead."
+                </div>
+                
+                {/* Duplicate choices */}
+                <div style={{ display: 'flex', flexDirection: 'column', gap: '0.5rem', marginTop: '0.5rem' }}>
+                  <button
+                    type="button"
+                    onClick={() => handleSupportExisting(duplicateCheck.duplicateIssueId)}
+                    disabled={isSubmitting}
+                    style={{
+                      background: '#10b981',
+                      color: 'white',
+                      border: 'none',
+                      padding: '0.75rem',
+                      borderRadius: '8px',
+                      cursor: 'pointer',
+                      fontWeight: '600',
+                      transition: 'all 0.2s'
+                    }}
+                  >
+                    👍 Support Existing (+8 Points)
+                  </button>
+                  <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '0.5rem' }}>
+                    <button
+                      type="button"
+                      onClick={() => navigate(`/issue/${duplicateCheck.duplicateIssueId}`)}
+                      style={{
+                        background: '#e2e8f0',
+                        color: '#334155',
+                        border: 'none',
+                        padding: '0.625rem',
+                        borderRadius: '8px',
+                        cursor: 'pointer',
+                        fontWeight: '600'
+                      }}
+                    >
+                      🔗 Join Complaint
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => navigate(`/issue/${duplicateCheck.duplicateIssueId}?addEvidence=true`)}
+                      style={{
+                        background: '#e2e8f0',
+                        color: '#334155',
+                        border: 'none',
+                        padding: '0.625rem',
+                        borderRadius: '8px',
+                        cursor: 'pointer',
+                        fontWeight: '600'
+                      }}
+                    >
+                      📸 Add Evidence
+                    </button>
+                  </div>
+                </div>
+              </div>
+            ) : (
+              <div style={{
+                background: '#f0fdf4',
+                border: '1px solid #bbf7d0',
+                borderRadius: '12px',
+                padding: '1rem',
+                color: '#15803d',
+                fontSize: '0.875rem',
+                display: 'flex',
+                alignItems: 'center',
+                gap: '0.5rem'
+              }}>
+                ✅ Unique report. No duplicates detected in coordinates vicinity.
+              </div>
+            )}
+
+            {/* Actions */}
+            <div style={{ display: 'flex', gap: '1rem', marginTop: '0.5rem' }}>
+              <button
+                type="button"
+                onClick={() => setShowAiModal(false)}
+                style={{
+                  flex: 1,
+                  background: 'transparent',
+                  border: '1px solid #cbd5e1',
+                  color: '#64748b',
+                  padding: '0.75rem',
+                  borderRadius: '8px',
+                  cursor: 'pointer',
+                  fontWeight: '600'
+                }}
+              >
+                Go Back & Edit
+              </button>
+              {!duplicateCheck?.duplicate && (
+                <button
+                  type="button"
+                  onClick={executeSubmit}
+                  disabled={isSubmitting}
+                  style={{
+                    flex: 2,
+                    background: '#1e4359',
+                    color: 'white',
+                    border: 'none',
+                    padding: '0.75rem',
+                    borderRadius: '8px',
+                    cursor: 'pointer',
+                    fontWeight: '600',
+                    boxShadow: '0 4px 6px -1px rgba(30, 67, 89, 0.3)'
+                  }}
+                >
+                  {isSubmitting ? 'Submitting...' : 'Confirm & Submit (+10 Points)'}
+                </button>
+              )}
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* AI analyzing overlay */}
+      {isAnalyzing && (
+        <div style={{
+          position: 'fixed',
+          top: 0,
+          left: 0,
+          width: '100%',
+          height: '100%',
+          backgroundColor: 'rgba(15, 23, 42, 0.65)',
+          backdropFilter: 'blur(4px)',
+          display: 'flex',
+          flexDirection: 'column',
+          justifyContent: 'center',
+          alignItems: 'center',
+          gap: '1rem',
+          zIndex: 2000
+        }}>
+          <div style={{
+            width: '40px',
+            height: '40px',
+            border: '4px solid rgba(255, 255, 255, 0.2)',
+            borderTop: '4px solid #38bdf8',
+            borderRadius: '50%',
+            animation: 'spin 1s linear infinite'
+          }}></div>
+          <span style={{ color: 'white', fontWeight: '600', fontSize: '1.1rem' }}>
+            Gemini AI analyzing report details...
+          </span>
+          <style>{`
+            @keyframes spin {
+              0% { transform: rotate(0deg); }
+              100% { transform: rotate(360deg); }
+            }
+          `}</style>
+        </div>
+      )}
     </div>
   );
 };

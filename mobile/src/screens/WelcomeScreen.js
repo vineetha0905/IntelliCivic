@@ -31,7 +31,7 @@ const WelcomeScreen = () => {
       <View style={styles.header}>
         <Text style={styles.title}>{t('welcome')}</Text>
         <Text style={styles.subtitle}>
-          Report and track civic issues in your community
+          Community Hero, Hyperlocal Problem Solver
         </Text>
       </View>
 

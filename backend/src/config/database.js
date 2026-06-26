@@ -2,7 +2,7 @@ const mongoose = require('mongoose');
 
 const connectDB = async () => {
   try {
-    const mongoUri = process.env.MONGODB_URI || 'mongodb://localhost:27017/civicconnect';
+    const mongoUri = process.env.MONGODB_URI || 'mongodb://localhost:27017/intellicivic';
     console.log('Connecting to MongoDB:', mongoUri);
     
     const options = {

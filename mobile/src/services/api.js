@@ -14,7 +14,7 @@ class ApiService {
 
   // Helper method to get auth headers
   async getAuthHeaders() {
-    const token = await AsyncStorage.getItem('civicconnect_token');
+    const token = await AsyncStorage.getItem('intellicivic_token');
     return {
       'Content-Type': 'application/json',
       ...(token && { Authorization: `Bearer ${token}` }),
@@ -42,7 +42,7 @@ class ApiService {
       name: file.fileName || 'image.jpg',
     });
 
-    const token = await AsyncStorage.getItem('civicconnect_token');
+    const token = await AsyncStorage.getItem('intellicivic_token');
     const headers = {};
     if (token) {
       headers.Authorization = `Bearer ${token}`;

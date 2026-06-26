@@ -27,6 +27,49 @@ const IssueDetail = ({ user, isAdmin }) => {
   const [newComment, setNewComment] = useState('');
   const [isLoading, setIsLoading] = useState(true);
 
+  // Verification States
+  const [verificationStatus, setVerificationStatus] = useState('verified'); // verified | rejected
+  const [verificationComment, setVerificationComment] = useState('');
+  const [verificationEvidence, setVerificationEvidence] = useState(null);
+  const [isVerifying, setIsVerifying] = useState(false);
+
+  const handleVerify = async (e) => {
+    e.preventDefault();
+    setIsVerifying(true);
+    try {
+      let evidenceUrl = '';
+      if (verificationEvidence) {
+        try {
+          const uploadResponse = await apiService.uploadImage(verificationEvidence);
+          const uploaded = uploadResponse?.data || uploadResponse || {};
+          evidenceUrl = uploaded.url || uploaded.secure_url || '';
+        } catch (uploadError) {
+          console.warn('Evidence upload failed, continuing without evidence:', uploadError);
+        }
+      }
+
+      const verifyResponse = await apiService.verifyIssue(id, {
+        status: verificationStatus,
+        comment: verificationComment,
+        evidenceUrl
+      });
+
+      if (verifyResponse.success) {
+        toast.success(`Verification submitted! Awarded ${verifyResponse.data?.pointsAwarded || 5} points.`);
+        setVerificationComment('');
+        setVerificationEvidence(null);
+        const fileInput = document.getElementById('evidenceInput');
+        if (fileInput) fileInput.value = '';
+        fetchIssueData();
+      }
+    } catch (error) {
+      console.error('Error verifying issue:', error);
+      toast.error('Failed to submit verification.');
+    } finally {
+      setIsVerifying(false);
+    }
+  };
+
   useEffect(() => {
     fetchIssueData();
   }, [id]);
@@ -67,7 +110,10 @@ const IssueDetail = ({ user, isAdmin }) => {
         assignedTo: getStringValue(rawIssue.assignedTo) || 'Unassigned',
         reportedBy: getStringValue(rawIssue.reportedBy) || 'Citizen',
         timestamp: rawIssue.createdAt || rawIssue.timestamp,
-        image: imageUrl
+        image: imageUrl,
+        verificationSummary: rawIssue.verificationSummary || null,
+        verifications: rawIssue.verifications || [],
+        aiResolution: rawIssue.aiResolution || null
       };
 
       setIssue(mappedIssue);
@@ -376,10 +422,63 @@ const IssueDetail = ({ user, isAdmin }) => {
             </div>
           </div>
 
-          <div className="bg-gray-50 rounded-lg p-4 mb-4">
-            <span className="text-sm font-medium text-gray-900">Category: </span>
-            <span className="text-sm text-gray-600">{typeof issue.category === 'string' ? issue.category : (issue.category?.name || 'General')}</span>
+          <div className="bg-gray-50 rounded-lg p-4 mb-4" style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+            <div>
+              <span className="text-sm font-medium text-gray-900">Category: </span>
+              <span className="text-sm text-gray-600">{typeof issue.category === 'string' ? issue.category : (issue.category?.name || 'General')}</span>
+            </div>
+            {issue.verificationSummary && (
+              <span style={{
+                fontSize: '0.75rem',
+                fontWeight: '700',
+                padding: '0.25rem 0.5rem',
+                borderRadius: '4px',
+                background: issue.verificationSummary.status === 'Verified' ? '#dcfce7' :
+                            issue.verificationSummary.status === 'Rejected' ? '#fee2e2' : '#fff7ed',
+                color: issue.verificationSummary.status === 'Verified' ? '#15803d' :
+                       issue.verificationSummary.status === 'Rejected' ? '#b91c1c' : '#c2410c'
+              }}>
+                🛡️ AI STATUS: {issue.verificationSummary.status} ({issue.verificationSummary.confidenceScore}%)
+              </span>
+            )}
           </div>
+
+          {/* Community Verification Summary Card */}
+          {issue.verificationSummary && (
+            <div style={{
+              background: issue.verificationSummary.status === 'Verified' ? '#f0fdf4' :
+                          issue.verificationSummary.status === 'Rejected' ? '#fef2f2' :
+                          issue.verificationSummary.status === 'Contested' ? '#fff7ed' : '#f8fafc',
+              border: `1px solid ${
+                issue.verificationSummary.status === 'Verified' ? '#bbf7d0' :
+                issue.verificationSummary.status === 'Rejected' ? '#fecaca' :
+                issue.verificationSummary.status === 'Contested' ? '#fed7aa' : '#cbd5e1'
+              }`,
+              borderRadius: '12px',
+              padding: '1.25rem',
+              marginBottom: '1.5rem'
+            }}>
+              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '0.5rem' }}>
+                <span style={{
+                  fontSize: '0.8rem',
+                  fontWeight: '700',
+                  textTransform: 'uppercase',
+                  letterSpacing: '0.05em',
+                  color: issue.verificationSummary.status === 'Verified' ? '#166534' :
+                         issue.verificationSummary.status === 'Rejected' ? '#991b1b' :
+                         issue.verificationSummary.status === 'Contested' ? '#9a3412' : '#475569'
+                }}>
+                  🛡️ Community Verification Consensus
+                </span>
+                <span style={{ fontSize: '0.85rem', fontWeight: '600', color: '#475569' }}>
+                  Confidence Score: {issue.verificationSummary.confidenceScore}%
+                </span>
+              </div>
+              <p style={{ margin: 0, fontSize: '0.9rem', color: '#334155', lineHeight: '1.5' }}>
+                {issue.verificationSummary.summary}
+              </p>
+            </div>
+          )}
 
           <div className="mb-4">
             <h3 className="text-base font-semibold text-gray-900 mb-2">Description</h3>
@@ -398,6 +497,30 @@ const IssueDetail = ({ user, isAdmin }) => {
                   className="w-full h-auto object-cover"
                   onError={(e) => { e.currentTarget.style.display = 'none'; }}
                 />
+              </div>
+            </div>
+          )}
+
+          {issue.status === 'resolved' && issue.aiResolution && (
+            <div style={{
+              background: '#f0fdf4',
+              border: '1px solid #bbf7d0',
+              borderRadius: '12px',
+              padding: '1.5rem',
+              marginBottom: '1.5rem',
+              marginTop: '1.5rem'
+            }}>
+              <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', color: '#15803d', fontWeight: '700', marginBottom: '0.75rem' }}>
+                ✨ AI Resolution Report (Citizen Version)
+              </div>
+              <h4 style={{ fontSize: '1rem', fontWeight: '600', color: '#166534', margin: '0 0 0.5rem 0' }}>
+                {issue.aiResolution.summary}
+              </h4>
+              <p style={{ margin: '0 0 0.75rem 0', fontSize: '0.925rem', color: '#1e3f20', lineHeight: '1.5' }}>
+                {issue.aiResolution.explanation}
+              </p>
+              <div style={{ fontSize: '0.85rem', color: '#15803d', fontWeight: '600', background: '#dcfce7', padding: '0.5rem 0.75rem', borderRadius: '8px', display: 'inline-block' }}>
+                🌱 Impact: {issue.aiResolution.impactStatement}
               </div>
             </div>
           )}
@@ -437,10 +560,6 @@ const IssueDetail = ({ user, isAdmin }) => {
                     <ThumbsUp size={16} />
                     {issue.upvotes} {isUpvoted ? 'Upvoted' : 'Upvote'}
                   </button>
-                  <button className="px-4 py-2 bg-gray-100 border border-gray-300 text-gray-700 rounded-lg text-sm font-medium hover:bg-gray-200 transition-colors flex items-center gap-2">
-                    <MessageCircle size={16} />
-                    Comment
-                  </button>
                 </>
               )}
             </div>
@@ -458,6 +577,105 @@ const IssueDetail = ({ user, isAdmin }) => {
             />
           </div>
         </div>
+
+        {/* Verification Submission Form Panel */}
+        {!isAdmin && issue.status !== 'resolved' && issue.status !== 'closed' && (
+          <div className="bg-white rounded-xl p-6 shadow-sm border border-gray-200 mb-6">
+            <h3 className="text-lg font-semibold text-gray-900 mb-4">Community Verification Engine</h3>
+            <p className="text-sm text-gray-600 mb-4">
+              Is this issue active and accurately described? Help confirm its validity. Nearby verifications increase the issue validation score.
+            </p>
+            
+            <form onSubmit={handleVerify} style={{ display: 'flex', flexDirection: 'column', gap: '1rem' }}>
+              <div style={{ display: 'flex', gap: '1rem' }}>
+                <label style={{
+                  flex: 1,
+                  display: 'flex',
+                  alignItems: 'center',
+                  justifyContent: 'center',
+                  gap: '0.5rem',
+                  padding: '0.75rem',
+                  border: `2px solid ${verificationStatus === 'verified' ? '#10b981' : '#cbd5e1'}`,
+                  borderRadius: '8px',
+                  cursor: 'pointer',
+                  backgroundColor: verificationStatus === 'verified' ? '#ecfdf5' : 'transparent',
+                  color: verificationStatus === 'verified' ? '#047857' : '#64748b',
+                  fontWeight: '600',
+                  transition: 'all 0.2s'
+                }}>
+                  <input
+                    type="radio"
+                    name="verificationStatus"
+                    value="verified"
+                    checked={verificationStatus === 'verified'}
+                    onChange={() => setVerificationStatus('verified')}
+                    style={{ display: 'none' }}
+                  />
+                  ✅ Verify Issue Active
+                </label>
+                
+                <label style={{
+                  flex: 1,
+                  display: 'flex',
+                  alignItems: 'center',
+                  justifyContent: 'center',
+                  gap: '0.5rem',
+                  padding: '0.75rem',
+                  border: `2px solid ${verificationStatus === 'rejected' ? '#ef4444' : '#cbd5e1'}`,
+                  borderRadius: '8px',
+                  cursor: 'pointer',
+                  backgroundColor: verificationStatus === 'rejected' ? '#fef2f2' : 'transparent',
+                  color: verificationStatus === 'rejected' ? '#b91c1c' : '#64748b',
+                  fontWeight: '600',
+                  transition: 'all 0.2s'
+                }}>
+                  <input
+                    type="radio"
+                    name="verificationStatus"
+                    value="rejected"
+                    checked={verificationStatus === 'rejected'}
+                    onChange={() => setVerificationStatus('rejected')}
+                    style={{ display: 'none' }}
+                  />
+                  ❌ Reject Issue / Resolved
+                </label>
+              </div>
+
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-1">Verification Comment</label>
+                <textarea
+                  value={verificationComment}
+                  onChange={(e) => setVerificationComment(e.target.value)}
+                  placeholder="Provide details about what you see at this location..."
+                  rows="3"
+                  className="w-full p-3 border border-gray-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 mb-2"
+                  style={{ width: '100%', boxSizing: 'border-box' }}
+                  required
+                />
+              </div>
+
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-1">Evidence Photo (Optional)</label>
+                <input
+                  id="evidenceInput"
+                  type="file"
+                  accept="image/*"
+                  onChange={(e) => setVerificationEvidence(e.target.files[0])}
+                  className="block w-full text-sm text-gray-500 file:mr-4 file:py-2 file:px-4 file:rounded-md file:border-0 file:text-sm file:font-semibold file:bg-blue-50 file:text-blue-700 hover:file:bg-blue-100"
+                />
+              </div>
+
+              <button
+                type="submit"
+                disabled={isVerifying}
+                className="w-full py-2.5 bg-blue-600 text-white rounded-lg text-sm font-medium hover:bg-blue-700 transition-colors disabled:opacity-50"
+                style={{ background: '#1e4359', color: 'white', border: 'none', cursor: 'pointer' }}
+              >
+                {isVerifying ? 'Submitting Verification...' : 'Submit Verification (+5 Points)'}
+              </button>
+            </form>
+          </div>
+        )}
 
         <div className="bg-white rounded-xl p-6 shadow-sm border border-gray-200 mb-6">
           <h3 className="text-lg font-semibold text-gray-900 mb-4">Progress Timeline</h3>

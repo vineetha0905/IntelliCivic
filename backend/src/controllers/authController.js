@@ -4,6 +4,16 @@ const emailService = require('../services/emailService');
 const notificationService = require('../services/notificationService');
 
 class AuthController {
+  constructor() {
+    this.cleanAddress = this.cleanAddress.bind(this);
+    this.register = this.register.bind(this);
+    this.login = this.login.bind(this);
+    this.sendOTP = this.sendOTP.bind(this);
+    this.verifyOTP = this.verifyOTP.bind(this);
+    this.guestLogin = this.guestLogin.bind(this);
+    this.adminLogin = this.adminLogin.bind(this);
+    this.employeeLogin = this.employeeLogin.bind(this);
+  }
   // Helper function to clean address object - removes undefined values, especially coordinates
   cleanAddress(addressObj) {
     if (!addressObj || typeof addressObj !== 'object') return null;
@@ -670,7 +680,7 @@ class AuthController {
         if (!adminUser) {
           adminUser = new User({
             name: 'Admin User',
-            email: process.env.ADMIN_EMAIL || 'admin@civicconnect.com',
+            email: process.env.ADMIN_EMAIL || 'admin@intellicivic.com',
             role: 'admin',
             isVerified: true,
             isActive: true

@@ -29,8 +29,8 @@ const AdminLogin = ({ setUser, setIsAdmin }) => {
         role: data.user.role || 'admin'
       };
       // Persist admin session and token for auth headers
-      localStorage.setItem('civicconnect_admin', JSON.stringify(adminUser));
-      localStorage.setItem('civicconnect_token', data.token);
+      localStorage.setItem('intellicivic_admin', JSON.stringify(adminUser));
+      localStorage.setItem('intellicivic_token', data.token);
       setUser(adminUser);
       setIsAdmin(true);
       navigate('/admin');

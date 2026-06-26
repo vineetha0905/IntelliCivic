@@ -52,14 +52,14 @@ const Register = () => {
       toast.success('Registered successfully');
       // Optionally store token/user if returned
       if (result.data && result.data.token && result.data.user) {
-        localStorage.setItem('civicconnect_user', JSON.stringify({
+        localStorage.setItem('intellicivic_user', JSON.stringify({
           id: result.data.user._id,
           name: result.data.user.name,
           phone: result.data.user.mobile || null,
           isGuest: false,
           token: result.data.token
         }));
-        localStorage.setItem('civicconnect_token', result.data.token);
+        localStorage.setItem('intellicivic_token', result.data.token);
       }
       navigate('/login');
     } catch (error) {

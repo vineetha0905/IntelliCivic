@@ -3,6 +3,7 @@ const Comment = require('../models/Comment');
 const User = require('../models/User');
 const notificationService = require('../services/notificationService');
 const { v4: uuidv4 } = require('uuid');
+const geminiService = require('../services/geminiService');
 
 class IssueController {
 
@@ -250,6 +251,12 @@ class IssueController {
       issue.closedAt = new Date();
       await issue.save();
 
+      // Award 10 points to reporter for Confirmed Resolution (close)
+      if (req.user && req.user.role === 'citizen') {
+        req.user.points = (req.user.points || 0) + 10;
+        await req.user.save();
+      }
+
       // Delete the issue after it's been closed
       await issue.deleteOne();
       console.log(`Issue ${issue._id} closed and deleted by citizen ${req.user._id}`);
@@ -360,7 +367,7 @@ class IssueController {
       // Generate reportId for tracking (used for dataset removal when resolved)
       const reportId = uuidv4();
 
-      // ML validation is now optional - if it fails, we proceed with provided/default category
+      // ML validation is now strict. If it fails to verify or classify, the report is rejected.
       if (process.env.ML_API_URL) {
         try {
           const coords = location?.coordinates;
@@ -368,21 +375,52 @@ class IssueController {
           const longitude = Array.isArray(coords) ? coords[1] : coords?.longitude || null;
 
           // Get image URL from request if available
-          let imageUrl = null;
-          if (req.body.images && Array.isArray(req.body.images) && req.body.images.length > 0) {
+          let imageUrl = req.body.imageUrl || null;
+          if (!imageUrl && req.body.images && Array.isArray(req.body.images) && req.body.images.length > 0) {
             imageUrl = req.body.images[0].url || null;
           }
-          const mlPayload = {
-            report_id: reportId,
-            description,
-            user_id: req.user._id.toString(),
-            image_url: imageUrl,
-            latitude,
-            longitude
-          };
 
-          // Set a timeout for ML validation (45 seconds) - increased for Render cold starts
-          // Use Promise.race for compatibility
+          // Build multipart form data to call Python ML backend
+          const formData = new FormData();
+          formData.append('report_id', reportId);
+          formData.append('description', description);
+          formData.append('user_id', req.user._id.toString());
+          if (latitude !== null && latitude !== undefined) {
+            formData.append('latitude', latitude.toString());
+          }
+          if (longitude !== null && longitude !== undefined) {
+            formData.append('longitude', longitude.toString());
+          }
+          if (category) {
+            formData.append('category', category);
+          }
+          if (title) {
+            formData.append('title', title);
+          }
+
+          if (imageUrl) {
+            try {
+              const imageResponse = await fetch(imageUrl);
+              if (imageResponse.ok) {
+                const imageBlob = await imageResponse.blob();
+                formData.append('image', imageBlob, 'image.jpg');
+              } else {
+                console.error('Failed to fetch image from Cloudinary:', imageResponse.statusText);
+                return res.status(400).json({
+                  success: false,
+                  message: 'Unable to verify uploaded image.'
+                });
+              }
+            } catch (imgFetchErr) {
+              console.error('Error fetching image from Cloudinary:', imgFetchErr.message);
+              return res.status(400).json({
+                success: false,
+                message: 'Unable to verify uploaded image.'
+              });
+            }
+          }
+
+          // Set a timeout for ML validation (45 seconds)
           const timeoutPromise = new Promise((_, reject) => 
             setTimeout(() => reject(new Error('ML_TIMEOUT')), 45000)
           );
@@ -391,8 +429,7 @@ class IssueController {
             const mlResponse = await Promise.race([
               fetch(process.env.ML_API_URL, {
                 method: 'POST',
-                headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify(mlPayload)
+                body: formData // Node fetch automatically sets multipart headers and boundary
               }),
               timeoutPromise
             ]);
@@ -401,11 +438,11 @@ class IssueController {
               const parsed = await mlResponse.json();
               mlResult = parsed;
 
-              // Only reject if ML explicitly rejects the report
+              // Reject if ML explicitly rejects the report
               if (mlResult && mlResult.accept === false && mlResult.status === 'rejected') {
                 const reason = mlResult.reason || 'Report rejected by validator';
                 
-                // Deduct points from user for rejected report (only if not already deducted for this report)
+                // Deduct points from user for rejected report
                 if (req.user && req.user._id) {
                   try {
                     const reporter = await User.findById(req.user._id);
@@ -417,14 +454,15 @@ class IssueController {
                     }
                   } catch (pointsError) {
                     console.error('Error deducting points:', pointsError);
-                    // Continue with rejection even if points update fails
                   }
                 }
                 
                 return res.status(400).json({
                   success: false,
-                  message: reason,
-                  reason: reason
+                  accepted: false,
+                  message: 'Validation Error',
+                  reason: reason,
+                  validation: mlResult.validation || (reason.includes('match') ? 'category_mismatch' : undefined)
                 });
               }
 
@@ -438,24 +476,29 @@ class IssueController {
                 priority = mlResult.urgency;
               }
             } else {
-              // ML service returned error - log but continue with default category
-              console.warn('ML service returned error, using default category:', mlResponse.status);
+              console.error('ML service returned non-ok response:', mlResponse.status);
+              return res.status(400).json({
+                success: false,
+                message: 'Unable to verify uploaded image.'
+              });
             }
           } catch (fetchError) {
-            // Timeout or network error - log but continue with default category
-            if (fetchError.message === 'ML_TIMEOUT') {
-              console.warn('ML validation timeout, using default category');
-            } else {
-              console.warn('ML validation network error, using default category:', fetchError.message);
-            }
+            console.error('ML validation fetch error:', fetchError.message);
+            return res.status(400).json({
+              success: false,
+              message: 'Unable to verify uploaded image.'
+            });
           }
         } catch (mlError) {
-          // Any other ML error - log but continue with default category
-          console.warn('ML validation error (non-blocking), using default category:', mlError.message);
+          console.error('ML validation outer error:', mlError.message);
+          return res.status(400).json({
+            success: false,
+            message: 'Unable to verify uploaded image.'
+          });
         }
       } else {
-        // ML_API_URL not configured - use default category (non-blocking)
-        console.log('ML_API_URL not configured, using default category');
+        // If ML API is required in env but not present, fallback
+        console.log('ML_API_URL not configured');
       }
 
       // ---------- IMAGE NORMALIZATION ----------
@@ -476,6 +519,10 @@ class IssueController {
         }
       } catch (_) {}
 
+      if ((!images || images.length === 0) && req.body.imageUrl) {
+        images = [{ url: req.body.imageUrl, caption: 'Issue image' }];
+      }
+
       if ((!images || images.length === 0) && req.files?.images) {
         images = req.files.images;
       }
@@ -492,10 +539,30 @@ class IssueController {
       };
       const finalPriority = priorityMap[priority?.toLowerCase()] || 'medium';
       
+      // Map category to Mongoose DB enum values
+      const dbCategoryMap = {
+        'Road & Traffic': 'Road Damage',
+        'Road Damage': 'Road Damage',
+        'Traffic Issue': 'Traffic Issue',
+        'Water & Drainage': 'Water Leakage',
+        'Water Leakage': 'Water Leakage',
+        'Drainage Issue': 'Drainage Issue',
+        'Garbage & Sanitation': 'Garbage & Sanitation',
+        'Street Lighting': 'Streetlight Failure',
+        'Streetlight Failure': 'Streetlight Failure',
+        'Electricity': 'Public Infrastructure',
+        'Parks & Recreation': 'Public Infrastructure',
+        'Public Infrastructure': 'Public Infrastructure',
+        'Public Safety': 'Environmental Hazard',
+        'Environmental Hazard': 'Environmental Hazard',
+        'Other': 'Other'
+      };
+      const finalCategory = dbCategoryMap[category] || 'Other';
+
       const issue = new Issue({
         title,
         description,
-        category, // Use ML-detected category or provided/default
+        category: finalCategory, // Use mapped category
         location,
         priority: finalPriority,
         tags,
@@ -504,15 +571,23 @@ class IssueController {
         images,
         documents: req.files?.documents || [],
         status: 'reported', // Explicitly set status to 'reported' - must stay 'reported' until employee accepts
-        reportId: reportId || null // Store report_id for ML dataset removal
+        reportId: reportId || null, // Store report_id for ML dataset removal
+        aiAnalysis: req.body.aiAnalysis || null
       });
 
       await issue.save();
+
+      // Award 10 points to citizen for reporting
+      if (req.user && req.user.role === 'citizen') {
+        req.user.points = (req.user.points || 0) + 10;
+        await req.user.save();
+      }
+
       await issue.populate('reportedBy', 'name email profileImage');
 
       // AUTO-ASSIGN TO DEPARTMENT: Automatically assign issue to all employees in the department
       try {
-        const issueCategory = category;
+        const issueCategory = finalCategory;
         
         // Find all active employees with matching department
         const employeeRoles = ['field-staff', 'supervisor', 'commissioner', 'employee'];
@@ -631,7 +706,17 @@ class IssueController {
   async upvoteIssue(req, res) {
     try {
       const issue = await Issue.findById(req.params.id);
-      await issue.upvote(req.user._id);
+      if (!issue) return res.status(404).json({ success: false, message: 'Issue not found' });
+
+      const alreadyUpvoted = issue.upvotedBy.includes(req.user._id);
+      if (!alreadyUpvoted) {
+        await issue.upvote(req.user._id);
+
+        if (req.user && req.user.role === 'citizen') {
+          req.user.points = (req.user.points || 0) + 3;
+          await req.user.save();
+        }
+      }
       res.json({ success: true, upvotes: issue.upvotes });
     } catch (error) {
       res.status(500).json({ success: false });
@@ -671,6 +756,219 @@ class IssueController {
       res.status(201).json({ success: true, data: comment });
     } catch (error) {
       res.status(500).json({ success: false });
+    }
+  }
+
+  // ===============================
+  // GEMINI & ADVANCED CIVIC INTELLIGENCE
+  // ===============================
+  
+  async analyzeIssueText(req, res) {
+    try {
+      const { description, imageBase64 } = req.body;
+      if (!description || !description.trim()) {
+        return res.status(400).json({ success: false, message: 'Description is required' });
+      }
+
+      const result = await geminiService.analyzeIssue(description, imageBase64);
+      if (result && result.is_abusive) {
+        return res.status(400).json({
+          success: false,
+          accepted: false,
+          reason: 'Abusive language detected.',
+          validation: 'profanity_detected'
+        });
+      }
+      return res.json({ success: true, data: result });
+    } catch (error) {
+      console.error('analyzeIssueText error:', error);
+      return res.status(500).json({ success: false, message: error.message });
+    }
+  }
+
+  async checkDuplicateIssue(req, res) {
+    try {
+      const { description, category, coordinates, locationName, imageBase64 } = req.body;
+      if (!description || !coordinates || !coordinates.latitude || !coordinates.longitude) {
+        return res.status(400).json({ success: false, message: 'Description and coordinates are required' });
+      }
+
+      // Bounding box approximation for 500 meters (~0.0045 degrees)
+      const lat = parseFloat(coordinates.latitude);
+      const lng = parseFloat(coordinates.longitude);
+      const latDelta = 0.0045;
+      const lngDelta = 0.0045;
+
+      // Query database for unresolved issues in the same category within the bounding box
+      const nearbyIssues = await Issue.find({
+        category,
+        status: { $in: ['reported', 'assigned', 'accepted', 'in-progress', 'escalated'] },
+        'location.coordinates.latitude': { $gte: lat - latDelta, $lte: lat + latDelta },
+        'location.coordinates.longitude': { $gte: lng - lngDelta, $lte: lng + lngDelta }
+      }).limit(5).lean();
+
+      // Run duplicate detection through Gemini
+      const result = await geminiService.checkDuplicate(
+        { description, category, locationName, coordinates, imageBase64 },
+        nearbyIssues
+      );
+
+      return res.json({ success: true, data: result });
+    } catch (error) {
+      console.error('checkDuplicateIssue error:', error);
+      return res.status(500).json({ success: false, message: error.message });
+    }
+  }
+
+  async verifyIssue(req, res) {
+    try {
+      const { id } = req.params;
+      const { status, comment, evidenceUrl } = req.body;
+
+      if (!['verified', 'rejected'].includes(status)) {
+        return res.status(400).json({ success: false, message: 'Status must be verified or rejected' });
+      }
+
+      const issue = await Issue.findById(id);
+      if (!issue) {
+        return res.status(404).json({ success: false, message: 'Issue not found' });
+      }
+
+      // Calculate weight based on user trust / role
+      const weight = req.user.role === 'admin' ? 5.0 :
+                     ['employee', 'field-staff', 'supervisor', 'commissioner'].includes(req.user.role) ? 2.5 :
+                     req.user.isVerified ? 1.5 : 1.0;
+
+      const existingVoteIndex = issue.verifications.findIndex(v => v.user.toString() === req.user._id.toString());
+      const voteData = {
+        user: req.user._id,
+        status,
+        comment,
+        evidenceUrl,
+        confidenceScore: weight,
+        createdAt: new Date()
+      };
+
+      let awardedPoints = false;
+      if (existingVoteIndex > -1) {
+        issue.verifications[existingVoteIndex] = voteData;
+      } else {
+        issue.verifications.push(voteData);
+        // Award 5 points to user for verifying
+        if (req.user && req.user.role === 'citizen') {
+          req.user.points = (req.user.points || 0) + 5;
+          await req.user.save();
+          awardedPoints = true;
+        }
+      }
+
+      // Async/Inline summary update using Gemini
+      const comments = await Comment.find({ issue: id, isDeleted: false }).lean();
+      
+      // Map verifications details for summarizer
+      const verificationsSummaryData = issue.verifications.map(v => ({
+        userRole: req.user.role,
+        status: v.status,
+        comment: v.comment
+      }));
+
+      try {
+        const consensus = await geminiService.summarizeCommunityFeedback(comments, verificationsSummaryData);
+        
+        issue.verificationSummary = {
+          status: consensus.verification_status,
+          summary: consensus.community_summary,
+          confidenceScore: consensus.confidence_score,
+          updatedAt: new Date()
+        };
+      } catch (sumError) {
+        console.error('Gemini verification summarization error (non-blocking):', sumError);
+      }
+
+      await issue.save();
+
+      // Check if verification summary confidence score is high (>= 80) and awards "Community Validation" points (+5 points to reporter and verifiers)
+      if (issue.verificationSummary?.confidenceScore >= 80 && !issue.pointsAwarded) {
+        // Trigger bonus reward for community validation once
+        try {
+          const reporter = await User.findById(issue.reportedBy);
+          if (reporter && reporter.role === 'citizen') {
+            reporter.points = (reporter.points || 0) + 5;
+            await reporter.save();
+          }
+        } catch (e) {
+          console.error('Bonus points award failed:', e);
+        }
+      }
+
+      return res.json({
+        success: true,
+        message: 'Verification recorded successfully',
+        data: {
+          verifications: issue.verifications,
+          summary: issue.verificationSummary,
+          pointsAwarded: awardedPoints ? 5 : 0
+        }
+      });
+    } catch (error) {
+      console.error('verifyIssue error:', error);
+      return res.status(500).json({ success: false, message: error.message });
+    }
+  }
+
+  async getCivicInsights(req, res) {
+    try {
+      // Pull recent issues (e.g. last 100 issues)
+      const issues = await Issue.find({ isPublic: true })
+        .sort({ createdAt: -1 })
+        .limit(100)
+        .lean();
+
+      const insights = await geminiService.generateCivicInsights(issues);
+      return res.json({ success: true, data: insights });
+    } catch (error) {
+      console.error('getCivicInsights error:', error);
+      return res.status(500).json({ success: false, message: error.message });
+    }
+  }
+
+  async getPredictiveInsights(req, res) {
+    try {
+      const issues = await Issue.find({ isPublic: true })
+        .sort({ createdAt: -1 })
+        .limit(150)
+        .lean();
+
+      const predictive = await geminiService.generatePredictiveInsights(issues);
+      return res.json({ success: true, data: predictive });
+    } catch (error) {
+      console.error('getPredictiveInsights error:', error);
+      return res.status(500).json({ success: false, message: error.message });
+    }
+  }
+
+  async getExecutiveGovernance(req, res) {
+    try {
+      if (req.user.role !== 'admin') {
+        return res.status(403).json({ success: false, message: 'Access denied. Admin privileges required.' });
+      }
+
+      const issues = await Issue.find().sort({ createdAt: -1 }).limit(100).lean();
+      
+      // Calculate overall stats
+      const userCount = await User.countDocuments({ role: 'citizen' });
+      const activeUserCount = await User.countDocuments({ role: 'citizen', isActive: true });
+      const userStats = {
+        totalCitizens: userCount,
+        activeCitizens: activeUserCount,
+        citizenEngagementRate: userCount > 0 ? Math.round((activeUserCount / userCount) * 100) : 0
+      };
+
+      const governance = await geminiService.generateExecutiveGovernance(issues, userStats);
+      return res.json({ success: true, data: governance });
+    } catch (error) {
+      console.error('getExecutiveGovernance error:', error);
+      return res.status(500).json({ success: false, message: error.message });
     }
   }
 }

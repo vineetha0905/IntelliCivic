@@ -8,7 +8,7 @@ import sys
 import json
 
 # Initialize app first - this must work
-app = FastAPI(title="Civic ML Backend API", version="1.0.0")
+app = FastAPI(title="IntelliCivic ML Backend API", version="1.0.0")
 
 # Try to import ML modules - make them optional so app can start even if they fail
 classify_report = None
@@ -17,10 +17,10 @@ ml_available = False
 try:
     from app.pipeline import classify_report
     ml_available = True
-    print("✅ ML modules loaded successfully")
+    print("ML modules loaded successfully")
 except Exception as e:
-    print(f"⚠️ ML modules not available (non-critical): {e}")
-    print("⚠️ API will return default responses")
+    print(f"ML modules not available (non-critical): {e}")
+    print("API will return default responses")
 
 # Log startup information
 print("=" * 50)
@@ -68,6 +68,8 @@ async def submit_report(
     user_id: Optional[str] = Form(None, description="Optional user identifier"),
     latitude: Optional[str] = Form(None, description="Optional latitude as string (e.g., '37.7749')"),
     longitude: Optional[str] = Form(None, description="Optional longitude as string (e.g., '-122.4194')"),
+    category: Optional[str] = Form(None, description="Selected category of the issue"),
+    title: Optional[str] = Form(None, description="Optional title of the issue"),
     image: Optional[UploadFile] = File(None, description="Optional image file (JPEG, PNG, etc.)")
 ):
     """
@@ -79,12 +81,13 @@ async def submit_report(
     - user_id (optional, string): User identifier
     - latitude (optional, string): Latitude coordinate (-90 to 90), will be converted to float
     - longitude (optional, string): Longitude coordinate (-180 to 180), will be converted to float
+    - category (optional, string): Selected category of the issue
     - image (optional, file): Image file (JPEG, PNG, etc.)
     
     Returns a JSON response with classification results.
     """
     try:
-        print(f"Received ML validation request: report_id={report_id}, description_length={len(description or '')}")
+        print(f"Received ML validation request: report_id={report_id}, description_length={len(description or '')}, category={category}")
         
         # Validate required fields with clear error messages
         if not report_id or not report_id.strip():
@@ -102,6 +105,8 @@ async def submit_report(
         report_id = report_id.strip()
         description = description.strip()
         user_id = user_id.strip() if user_id else None
+        category = category.strip() if category else None
+        title = title.strip() if title else None
         
         # Validate and convert latitude
         latitude_float = None
@@ -176,6 +181,8 @@ async def submit_report(
             "report_id": report_id,
             "description": description,
             "user_id": user_id,
+            "category": category,
+            "title": title,
             "image_bytes": image_bytes,  # Changed from image_url to image_bytes
             "latitude": latitude_float,
             "longitude": longitude_float

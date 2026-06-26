@@ -33,8 +33,15 @@ const AdminDashboard = ({ user }) => {
   const [stats, setStats] = useState(null);
   const [loading, setLoading] = useState(true);
 
+  // AI-powered Civic Insights states
+  const [civicInsights, setCivicInsights] = useState(null);
+  const [predictiveInsights, setPredictiveInsights] = useState(null);
+  const [executiveGovernance, setExecutiveGovernance] = useState(null);
+  const [loadingAi, setLoadingAi] = useState(false);
+  const [aiTab, setAiTab] = useState('charts'); // 'charts' | 'civic' | 'predictive' | 'governance'
+
   const handleLogout = () => {
-    localStorage.removeItem('civicconnect_admin');
+    localStorage.removeItem('intellicivic_admin');
     navigate('/');
   };
 
@@ -54,6 +61,34 @@ const AdminDashboard = ({ user }) => {
     const interval = setInterval(fetchStats, 15000);
     return () => clearInterval(interval);
   }, []);
+
+  const fetchAiData = async (type) => {
+    setLoadingAi(true);
+    try {
+      if (type === 'civic' && !civicInsights) {
+        const resp = await apiService.getCivicInsights();
+        setCivicInsights(resp.data || resp);
+      } else if (type === 'predictive' && !predictiveInsights) {
+        const resp = await apiService.getPredictiveInsights();
+        setPredictiveInsights(resp.data || resp);
+      } else if (type === 'governance' && !executiveGovernance) {
+        const resp = await apiService.getExecutiveGovernance();
+        setExecutiveGovernance(resp.data || resp);
+      }
+    } catch (err) {
+      toast.error(`Failed to fetch AI insights: ${err.message}`);
+    } finally {
+      setLoadingAi(false);
+    }
+  };
+
+  useEffect(() => {
+    if (selectedView === 'analytics') {
+      if (aiTab !== 'charts') {
+        fetchAiData(aiTab);
+      }
+    }
+  }, [selectedView, aiTab]);
 
   const recentIssues = useMemo(() => {
     const list = stats?.recentIssues || [];
@@ -598,7 +633,9 @@ const AdminDashboard = ({ user }) => {
                   ] : null,
                   status: iss.status,
                   upvotes: iss.upvotedBy?.length || iss.upvotes || 0,
-                  description: iss.description
+                  description: iss.description,
+                  category: iss.category,
+                  priority: iss.priority
                 })).filter(i => Array.isArray(i.coordinates) && i.coordinates.length === 2)}
                 onMarkerClick={(issue) => navigate(`/issue/${issue.id}`)}
                 showCenterMarker={true}
@@ -613,11 +650,355 @@ const AdminDashboard = ({ user }) => {
         {/* Analytics */}
         {selectedView === 'analytics' && (
           <div>
-            <h3 style={{ fontSize: '1.2rem', fontWeight: '600', marginBottom: '1.5rem', color: '#1e293b' }}>
-              Analytics Dashboard
-            </h3>
-            
-            <ResolutionCharts />
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '1.5rem' }}>
+              <h3 style={{ fontSize: '1.4rem', fontWeight: '700', color: '#1e293b', margin: 0 }}>
+                Civic Intelligence & Analytics Portal
+              </h3>
+              <span style={{ fontSize: '0.85rem', color: '#64748b', background: '#e2e8f0', padding: '0.25rem 0.75rem', borderRadius: '9999px', fontWeight: '600' }}>
+                Powered by Gemini 2.5 Flash ✨
+              </span>
+            </div>
+
+            {/* Sub Tabs */}
+            <div style={{
+              display: 'flex',
+              gap: '0.5rem',
+              marginBottom: '2rem',
+              background: '#f1f5f9',
+              padding: '0.4rem',
+              borderRadius: '12px',
+              width: 'fit-content'
+            }}>
+              {[
+                { key: 'charts', label: 'Traditional Metrics & Charts', icon: BarChart3 },
+                { key: 'civic', label: 'AI Civic Insights', icon: TrendingUp },
+                { key: 'predictive', label: 'AI Predictive Risk Map', icon: AlertTriangle },
+                { key: 'governance', label: 'AI Executive Governance', icon: Users }
+              ].map(sub => (
+                <button
+                  key={sub.key}
+                  onClick={() => setAiTab(sub.key)}
+                  style={{
+                    background: aiTab === sub.key ? 'white' : 'transparent',
+                    color: aiTab === sub.key ? '#1e4359' : '#64748b',
+                    border: 'none',
+                    padding: '0.6rem 1.2rem',
+                    borderRadius: '8px',
+                    cursor: 'pointer',
+                    display: 'flex',
+                    alignItems: 'center',
+                    gap: '0.5rem',
+                    fontSize: '0.85rem',
+                    fontWeight: '600',
+                    boxShadow: aiTab === sub.key ? '0 1px 3px rgba(0,0,0,0.1)' : 'none',
+                    transition: 'all 0.2s'
+                  }}
+                >
+                  <sub.icon size={14} />
+                  {sub.label}
+                </button>
+              ))}
+            </div>
+
+            {/* Loading Indicator */}
+            {loadingAi ? (
+              <div style={{
+                display: 'flex',
+                flexDirection: 'column',
+                justifyContent: 'center',
+                alignItems: 'center',
+                height: '400px',
+                background: 'rgba(255,255,255,0.7)',
+                backdropFilter: 'blur(4px)',
+                borderRadius: '16px',
+                border: '1px solid rgba(226, 232, 240, 0.8)'
+              }}>
+                <div style={{
+                  width: '35px',
+                  height: '35px',
+                  border: '3px solid rgba(30, 67, 89, 0.1)',
+                  borderTop: '3px solid #1e4359',
+                  borderRadius: '50%',
+                  animation: 'spin 1s linear infinite',
+                  marginBottom: '1rem'
+                }}></div>
+                <span style={{ color: '#1e4359', fontWeight: '600', fontSize: '0.95rem' }}>
+                  Gemini AI compiling smart city insights...
+                </span>
+              </div>
+            ) : (
+              <>
+                {/* Traditional Charts */}
+                {aiTab === 'charts' && <ResolutionCharts />}
+
+                {/* AI Civic Insights */}
+                {aiTab === 'civic' && civicInsights && (
+                  <div style={{ display: 'flex', flexDirection: 'column', gap: '1.5rem' }}>
+                    {/* Insights top summary cards */}
+                    <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(280px, 1fr))', gap: '1rem' }}>
+                      <div style={{ background: 'linear-gradient(135deg, #eff6ff 0%, #dbeafe 100%)', padding: '1.5rem', borderRadius: '16px', border: '1px solid rgba(59, 130, 246, 0.1)' }}>
+                        <span style={{ fontSize: '0.75rem', fontWeight: '700', textTransform: 'uppercase', color: '#2563eb', letterSpacing: '0.05em' }}>Most Active Issue Category</span>
+                        <div style={{ fontSize: '1.5rem', fontWeight: '800', color: '#1e293b', marginTop: '0.5rem' }}>
+                          🔥 {civicInsights.most_common_issue_type || 'Road Damage'}
+                        </div>
+                      </div>
+                      <div style={{ background: 'linear-gradient(135deg, #fef2f2 0%, #fee2e2 100%)', padding: '1.5rem', borderRadius: '16px', border: '1px solid rgba(239, 68, 68, 0.1)' }}>
+                        <span style={{ fontSize: '0.75rem', fontWeight: '700', textTransform: 'uppercase', color: '#dc2626', letterSpacing: '0.05em' }}>High Risk Hotspots</span>
+                        <div style={{ display: 'flex', flexWrap: 'wrap', gap: '0.4rem', marginTop: '0.5rem' }}>
+                          {(civicInsights.complaint_hotspots || []).map((hotspot, idx) => (
+                            <span key={idx} style={{ background: 'white', border: '1px solid #fee2e2', color: '#991b1b', padding: '0.2rem 0.6rem', borderRadius: '6px', fontSize: '0.8rem', fontWeight: '600' }}>
+                              📍 {hotspot}
+                            </span>
+                          ))}
+                        </div>
+                      </div>
+                    </div>
+
+                    <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(350px, 1fr))', gap: '1.5rem' }}>
+                      {/* Left: Performance Details */}
+                      <div style={{ display: 'flex', flexDirection: 'column', gap: '1.5rem' }}>
+                        <div style={{ background: 'white', padding: '1.5rem', borderRadius: '16px', border: '1px solid #e2e8f0' }}>
+                          <h4 style={{ fontSize: '1.1rem', fontWeight: '700', color: '#1e293b', marginBottom: '1rem', display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
+                            📈 Resolution & SLA Trends
+                          </h4>
+                          <p style={{ margin: 0, fontSize: '0.925rem', color: '#475569', lineHeight: '1.6' }}>
+                            {civicInsights.resolution_trends}
+                          </p>
+                        </div>
+                        <div style={{ background: 'white', padding: '1.5rem', borderRadius: '16px', border: '1px solid #e2e8f0' }}>
+                          <h4 style={{ fontSize: '1.1rem', fontWeight: '700', color: '#1e293b', marginBottom: '1rem', display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
+                            🏢 Departmental Analysis
+                          </h4>
+                          <p style={{ margin: 0, fontSize: '0.925rem', color: '#475569', lineHeight: '1.6' }}>
+                            {civicInsights.department_performance}
+                          </p>
+                        </div>
+                      </div>
+
+                      {/* Right: Recommendations & Concerns */}
+                      <div style={{ display: 'flex', flexDirection: 'column', gap: '1.5rem' }}>
+                        <div style={{ background: 'white', padding: '1.5rem', borderRadius: '16px', border: '1px solid #e2e8f0' }}>
+                          <h4 style={{ fontSize: '1.1rem', fontWeight: '700', color: '#1e293b', marginBottom: '1rem', display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
+                            ⚠️ Emerging Concerns
+                          </h4>
+                          <div style={{ display: 'flex', flexDirection: 'column', gap: '0.75rem' }}>
+                            {(civicInsights.emerging_civic_concerns || []).map((concern, idx) => (
+                              <div key={idx} style={{ display: 'flex', gap: '0.75rem', alignItems: 'start', fontSize: '0.9rem', color: '#334155' }}>
+                                <span style={{ color: '#f59e0b' }}>⚡</span>
+                                <span style={{ lineHeight: '1.4' }}>{concern}</span>
+                              </div>
+                            ))}
+                          </div>
+                        </div>
+
+                        <div style={{ background: 'linear-gradient(135deg, #1e4359 0%, #102a3a 100%)', padding: '1.5rem', borderRadius: '16px', color: 'white' }}>
+                          <h4 style={{ fontSize: '1.1rem', fontWeight: '700', marginBottom: '1rem', display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
+                            ✨ Proactive Preventive Recommendations
+                          </h4>
+                          <div style={{ display: 'flex', flexDirection: 'column', gap: '0.75rem' }}>
+                            {(civicInsights.preventive_recommendations || []).map((rec, idx) => (
+                              <div key={idx} style={{ display: 'flex', gap: '0.75rem', alignItems: 'start', fontSize: '0.9rem', color: '#e2e8f0' }}>
+                                <span style={{ color: '#38bdf8' }}>✓</span>
+                                <span style={{ lineHeight: '1.4' }}>{rec}</span>
+                              </div>
+                            ))}
+                          </div>
+                        </div>
+                      </div>
+                    </div>
+                  </div>
+                )}
+
+                {/* AI Predictive Risk Map & Hotspots */}
+                {aiTab === 'predictive' && predictiveInsights && (
+                  <div style={{ display: 'flex', flexDirection: 'column', gap: '1.5rem' }}>
+                    <div style={{ background: 'white', padding: '1.5rem', borderRadius: '16px', border: '1px solid #e2e8f0' }}>
+                      <h4 style={{ fontSize: '1.2rem', fontWeight: '700', color: '#1e293b', marginBottom: '1rem' }}>
+                        🔮 Early Intervention Risk Heatmap
+                      </h4>
+                      <p style={{ fontSize: '0.9rem', color: '#64748b', marginBottom: '1.5rem' }}>
+                        These zones represent locations with high frequencies of recurring complaints or infrastructure wear detected dynamically by Gemini AI analysis.
+                      </p>
+
+                      <div style={{ display: 'flex', flexDirection: 'column', gap: '1rem' }}>
+                        {(predictiveInsights.recurring_risk_zones || []).map((zone, idx) => (
+                          <div key={idx} style={{
+                            display: 'flex',
+                            justifyContent: 'space-between',
+                            alignItems: 'center',
+                            padding: '1rem 1.25rem',
+                            borderRadius: '12px',
+                            background: zone.risk === 'High' ? '#fef2f2' : zone.risk === 'Medium' ? '#fff7ed' : '#f0fdf4',
+                            border: `1px solid ${zone.risk === 'High' ? '#fecaca' : zone.risk === 'Medium' ? '#fed7aa' : '#bbf7d0'}`,
+                          }}>
+                            <div style={{ display: 'flex', flexDirection: 'column', gap: '0.25rem' }}>
+                              <span style={{ fontWeight: '700', color: '#1e293b', fontSize: '1rem' }}>📍 {zone.location}</span>
+                              <span style={{ fontSize: '0.85rem', color: '#475569' }}>{zone.reason}</span>
+                            </div>
+                            <span style={{
+                              background: zone.risk === 'High' ? '#ef4444' : zone.risk === 'Medium' ? '#f59e0b' : '#10b981',
+                              color: 'white',
+                              padding: '0.25rem 0.75rem',
+                              borderRadius: '9999px',
+                              fontSize: '0.75rem',
+                              fontWeight: '700',
+                              textTransform: 'uppercase'
+                            }}>{zone.risk} Risk</span>
+                          </div>
+                        ))}
+                      </div>
+                    </div>
+
+                    <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(350px, 1fr))', gap: '1.5rem' }}>
+                      <div style={{ background: 'white', padding: '1.5rem', borderRadius: '16px', border: '1px solid #e2e8f0' }}>
+                        <h4 style={{ fontSize: '1.1rem', fontWeight: '700', color: '#1e293b', marginBottom: '1rem' }}>
+                          🪵 Infrastructure Nodes Requiring Replacement
+                        </h4>
+                        <div style={{ display: 'flex', flexDirection: 'column', gap: '0.75rem' }}>
+                          {(predictiveInsights.damaged_infrastructure || []).map((node, idx) => (
+                            <div key={idx} style={{ display: 'flex', gap: '0.75rem', alignItems: 'center', fontSize: '0.9rem', color: '#334155' }}>
+                              <span style={{ color: '#ef4444' }}>🔧</span>
+                              <span>{node}</span>
+                            </div>
+                          ))}
+                        </div>
+                      </div>
+
+                      <div style={{ background: 'white', padding: '1.5rem', borderRadius: '16px', border: '1px solid #e2e8f0' }}>
+                        <h4 style={{ fontSize: '1.1rem', fontWeight: '700', color: '#1e293b', marginBottom: '1rem' }}>
+                          📅 Seasonal Trends & Forecasts
+                        </h4>
+                        <div style={{ display: 'flex', flexDirection: 'column', gap: '0.75rem' }}>
+                          {(predictiveInsights.seasonal_trends || []).map((trend, idx) => (
+                            <div key={idx} style={{ display: 'flex', gap: '0.75rem', alignItems: 'center', fontSize: '0.9rem', color: '#334155' }}>
+                              <span style={{ color: '#3b82f6' }}>⛈️</span>
+                              <span>{trend}</span>
+                            </div>
+                          ))}
+                        </div>
+                      </div>
+                    </div>
+
+                    <div style={{ background: 'linear-gradient(135deg, #10b981 0%, #047857 100%)', padding: '1.5rem', borderRadius: '16px', color: 'white' }}>
+                      <h4 style={{ fontSize: '1.1rem', fontWeight: '700', marginBottom: '1rem' }}>
+                        🛡️ Proactive Municipal Interventions
+                      </h4>
+                      <div style={{ display: 'flex', flexDirection: 'column', gap: '0.75rem' }}>
+                        {(predictiveInsights.proactive_interventions || []).map((action, idx) => (
+                          <div key={idx} style={{ display: 'flex', gap: '0.75rem', alignItems: 'start', fontSize: '0.9rem', color: '#d1fae5' }}>
+                            <span style={{ color: '#a7f3d0' }}>✦</span>
+                            <span style={{ lineHeight: '1.4' }}>{action}</span>
+                          </div>
+                        ))}
+                      </div>
+                    </div>
+                  </div>
+                )}
+
+                {/* AI Executive Governance Report */}
+                {aiTab === 'governance' && executiveGovernance && (
+                  <div style={{ display: 'flex', flexDirection: 'column', gap: '1.5rem' }}>
+                    {/* Public Engagement & Efficiency Summary Cards */}
+                    <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(280px, 1fr))', gap: '1rem' }}>
+                      <div style={{ background: 'white', padding: '1.5rem', borderRadius: '16px', border: '1px solid #e2e8f0' }}>
+                        <span style={{ fontSize: '0.75rem', fontWeight: '700', textTransform: 'uppercase', color: '#64748b', letterSpacing: '0.05em' }}>Resolution Efficiency</span>
+                        <p style={{ margin: '0.5rem 0 0 0', fontSize: '0.925rem', color: '#334155', lineHeight: '1.5' }}>
+                          {executiveGovernance.resolution_efficiency}
+                        </p>
+                      </div>
+                      <div style={{ background: 'white', padding: '1.5rem', borderRadius: '16px', border: '1px solid #e2e8f0' }}>
+                        <span style={{ fontSize: '0.75rem', fontWeight: '700', textTransform: 'uppercase', color: '#64748b', letterSpacing: '0.05em' }}>Citizen Trust & Engagement</span>
+                        <p style={{ margin: '0.5rem 0 0 0', fontSize: '0.925rem', color: '#334155', lineHeight: '1.5' }}>
+                          {executiveGovernance.citizen_engagement}
+                        </p>
+                      </div>
+                    </div>
+
+                    <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(350px, 1fr))', gap: '1.5rem' }}>
+                      {/* Left: Ward Performance Table */}
+                      <div style={{ background: 'white', padding: '1.5rem', borderRadius: '16px', border: '1px solid #e2e8f0' }}>
+                        <h4 style={{ fontSize: '1.1rem', fontWeight: '700', color: '#1e293b', marginBottom: '1rem' }}>
+                          📊 Ward Performance & Efficiency
+                        </h4>
+                        <div style={{ overflowX: 'auto' }}>
+                          <table style={{ width: '100%', borderCollapse: 'collapse' }}>
+                            <thead>
+                              <tr style={{ borderBottom: '1px solid #e2e8f0', textAlign: 'left' }}>
+                                <th style={{ padding: '0.5rem', fontSize: '0.8rem', color: '#475569' }}>Ward Name</th>
+                                <th style={{ padding: '0.5rem', fontSize: '0.8rem', color: '#475569' }}>Efficiency</th>
+                                <th style={{ padding: '0.5rem', fontSize: '0.8rem', color: '#475569' }}>Status</th>
+                              </tr>
+                            </thead>
+                            <tbody>
+                              {(executiveGovernance.ward_performance || []).map((w, idx) => (
+                                <tr key={idx} style={{ borderBottom: '1px solid #f1f5f9' }}>
+                                  <td style={{ padding: '0.75rem 0.5rem', fontSize: '0.875rem', fontWeight: '600' }}>{w.ward}</td>
+                                  <td style={{ padding: '0.75rem 0.5rem', fontSize: '0.875rem' }}>{w.efficiency}</td>
+                                  <td style={{ padding: '0.75rem 0.5rem' }}>
+                                    <span style={{
+                                      background: w.status === 'Good' ? '#dcfce7' : w.status === 'Average' ? '#fef3c7' : '#fee2e2',
+                                      color: w.status === 'Good' ? '#15803d' : w.status === 'Average' ? '#b45309' : '#b91c1c',
+                                      padding: '0.2rem 0.5rem',
+                                      borderRadius: '6px',
+                                      fontSize: '0.75rem',
+                                      fontWeight: '600'
+                                    }}>{w.status}</span>
+                                  </td>
+                                </tr>
+                              ))}
+                            </tbody>
+                          </table>
+                        </div>
+                      </div>
+
+                      {/* Right: Departmental Backlogs & Metrics */}
+                      <div style={{ background: 'white', padding: '1.5rem', borderRadius: '16px', border: '1px solid #e2e8f0' }}>
+                        <h4 style={{ fontSize: '1.1rem', fontWeight: '700', color: '#1e293b', marginBottom: '1rem' }}>
+                          🏢 Departmental Performance Metrics
+                        </h4>
+                        <div style={{ overflowX: 'auto' }}>
+                          <table style={{ width: '100%', borderCollapse: 'collapse' }}>
+                            <thead>
+                              <tr style={{ borderBottom: '1px solid #e2e8f0', textAlign: 'left' }}>
+                                <th style={{ padding: '0.5rem', fontSize: '0.8rem', color: '#475569' }}>Department</th>
+                                <th style={{ padding: '0.5rem', fontSize: '0.8rem', color: '#475569' }}>Resolved</th>
+                                <th style={{ padding: '0.5rem', fontSize: '0.8rem', color: '#475569' }}>Pending</th>
+                                <th style={{ padding: '0.5rem', fontSize: '0.8rem', color: '#475569' }}>Avg. Time</th>
+                              </tr>
+                            </thead>
+                            <tbody>
+                              {(executiveGovernance.department_performance || []).map((dept, idx) => (
+                                <tr key={idx} style={{ borderBottom: '1px solid #f1f5f9' }}>
+                                  <td style={{ padding: '0.75rem 0.5rem', fontSize: '0.875rem', fontWeight: '600' }}>{dept.name}</td>
+                                  <td style={{ padding: '0.75rem 0.5rem', fontSize: '0.875rem', color: '#15803d', fontWeight: '600' }}>{dept.resolved}</td>
+                                  <td style={{ padding: '0.75rem 0.5rem', fontSize: '0.875rem', color: '#dc2626', fontWeight: '600' }}>{dept.pending}</td>
+                                  <td style={{ padding: '0.75rem 0.5rem', fontSize: '0.875rem', color: '#64748b' }}>{dept.avgTime}</td>
+                                </tr>
+                              ))}
+                            </tbody>
+                          </table>
+                        </div>
+                      </div>
+                    </div>
+
+                    {/* Executive Governance Policy/Administrative recommendations */}
+                    <div style={{ background: 'linear-gradient(135deg, #8b5cf6 0%, #6d28d9 100%)', padding: '1.5rem', borderRadius: '16px', color: 'white' }}>
+                      <h4 style={{ fontSize: '1.1rem', fontWeight: '700', marginBottom: '1rem' }}>
+                        🏛️ Executive Policy & Resource Allocation Recommendations
+                      </h4>
+                      <div style={{ display: 'flex', flexDirection: 'column', gap: '0.75rem' }}>
+                        {(executiveGovernance.ai_recommendations || []).map((rec, idx) => (
+                          <div key={idx} style={{ display: 'flex', gap: '0.75rem', alignItems: 'start', fontSize: '0.9rem', color: '#ede9fe' }}>
+                            <span style={{ color: '#ddd6fe' }}>★</span>
+                            <span style={{ lineHeight: '1.4' }}>{rec}</span>
+                          </div>
+                        ))}
+                      </div>
+                    </div>
+                  </div>
+                )}
+              </>
+            )}
           </div>
         )}
       </div>

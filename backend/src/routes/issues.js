@@ -58,6 +58,36 @@ router.get(
    PROTECTED ROUTES
 ================================ */
 router.post(
+  '/analyze',
+  authenticate,
+  safe(issueController.analyzeIssueText)
+);
+
+router.post(
+  '/check-duplicate',
+  authenticate,
+  safe(issueController.checkDuplicateIssue)
+);
+
+router.get(
+  '/analytics/civic-insights',
+  authenticate,
+  safe(issueController.getCivicInsights)
+);
+
+router.get(
+  '/analytics/predictive',
+  authenticate,
+  safe(issueController.getPredictiveInsights)
+);
+
+router.get(
+  '/analytics/governance',
+  authenticate,
+  safe(issueController.getExecutiveGovernance)
+);
+
+router.post(
   '/',
   authenticate,
   validateIssueCreation,
@@ -111,6 +141,16 @@ router.delete(
   authenticate,
   validateObjectId('id'),
   safe(issueController.removeUpvote)
+);
+
+/* ===============================
+   COMMUNITY VERIFICATION
+================================ */
+router.post(
+  '/:id/verify',
+  authenticate,
+  validateObjectId('id'),
+  safe(issueController.verifyIssue)
 );
 
 /* ===============================

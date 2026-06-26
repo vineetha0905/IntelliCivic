@@ -69,10 +69,10 @@ global.io = io;
 // Start server
 server.listen(PORT, () => {
   console.log(`
-🚀 CivicConnect API Server is running!
+🚀 IntelliCivic API Server is running!
 📍 Port: ${PORT}
 🌍 Environment: ${process.env.NODE_ENV || 'development'}
-📊 Database: ${process.env.MONGODB_URI || 'mongodb://localhost:27017/civicconnect'}
+📊 Database: ${process.env.MONGODB_URI || 'mongodb://localhost:27017/intellicivic'}
 🔗 API URL: http://localhost:${PORT}
 📚 Documentation: http://localhost:${PORT}/api/docs
   `);

@@ -70,7 +70,7 @@ const RegisterScreen = () => {
       <ScrollView contentContainerStyle={styles.scrollContent}>
         <View style={styles.header}>
           <Text style={styles.title}>Register</Text>
-          <Text style={styles.subtitle}>Create your CivicConnect account</Text>
+          <Text style={styles.subtitle}>Create your IntelliCivic account</Text>
         </View>
 
         <View style={styles.form}>

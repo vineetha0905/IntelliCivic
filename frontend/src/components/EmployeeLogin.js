@@ -18,8 +18,8 @@ const EmployeeLogin = ({ setUser, setIsAdmin }) => {
       const resp = await apiService.employeeLogin({ employeeId, password });
       const data = resp.data || resp;
       const { token, user } = data;
-      localStorage.setItem('civicconnect_token', token);
-      localStorage.setItem('civicconnect_user', JSON.stringify(user));
+      localStorage.setItem('intellicivic_token', token);
+      localStorage.setItem('intellicivic_user', JSON.stringify(user));
       setUser && setUser(user);
       setIsAdmin && setIsAdmin(false);
       toast.success('Logged in successfully');

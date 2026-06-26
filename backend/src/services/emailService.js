@@ -28,13 +28,13 @@ class EmailService {
     }
 
     const mailOptions = {
-      from: `${process.env.FROM_NAME || 'CivicConnect'} <${process.env.FROM_EMAIL}>`,
+      from: `${process.env.FROM_NAME || 'IntelliCivic'} <${process.env.FROM_EMAIL}>`,
       to: email,
-      subject: 'Your OTP for CivicConnect',
+      subject: 'Your OTP for IntelliCivic',
       html: `
         <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto;">
           <div style="background: linear-gradient(135deg, #667eea 0%, #764ba2 100%); padding: 2rem; text-align: center; color: white;">
-            <h1 style="margin: 0; font-size: 2rem;">CivicConnect</h1>
+            <h1 style="margin: 0; font-size: 2rem;">IntelliCivic</h1>
             <p style="margin: 0.5rem 0 0 0; opacity: 0.9;">Your OTP is ready</p>
           </div>
           
@@ -54,7 +54,7 @@ class EmailService {
           </div>
           
           <div style="background: #1e293b; padding: 1rem; text-align: center; color: white; font-size: 0.8rem;">
-            <p style="margin: 0;">© 2024 CivicConnect. All rights reserved.</p>
+            <p style="margin: 0;">© 2024 IntelliCivic. All rights reserved.</p>
           </div>
         </div>
       `
@@ -75,18 +75,18 @@ class EmailService {
     const mailOptions = {
       from: `${process.env.FROM_NAME} <${process.env.FROM_EMAIL}>`,
       to: email,
-      subject: 'Welcome to CivicConnect!',
+      subject: 'Welcome to IntelliCivic!',
       html: `
         <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto;">
           <div style="background: linear-gradient(135deg, #667eea 0%, #764ba2 100%); padding: 2rem; text-align: center; color: white;">
-            <h1 style="margin: 0; font-size: 2rem;">Welcome to CivicConnect!</h1>
+            <h1 style="margin: 0; font-size: 2rem;">Welcome to IntelliCivic!</h1>
             <p style="margin: 0.5rem 0 0 0; opacity: 0.9;">Your account has been created successfully</p>
           </div>
           
           <div style="padding: 2rem; background: #f8fafc;">
             <h2 style="color: #1e293b; margin-bottom: 1rem;">Hello ${name}!</h2>
             <p style="color: #64748b; line-height: 1.6; margin-bottom: 1.5rem;">
-              Welcome to CivicConnect! You can now report civic issues in your community and track their resolution.
+              Welcome to IntelliCivic! You can now report civic issues in your community and track their resolution.
             </p>
             
             <div style="background: white; padding: 1.5rem; border-radius: 8px; border-left: 4px solid #667eea;">
@@ -108,7 +108,7 @@ class EmailService {
           </div>
           
           <div style="background: #1e293b; padding: 1rem; text-align: center; color: white; font-size: 0.8rem;">
-            <p style="margin: 0;">© 2024 CivicConnect. All rights reserved.</p>
+            <p style="margin: 0;">© 2024 IntelliCivic. All rights reserved.</p>
           </div>
         </div>
       `
@@ -172,7 +172,7 @@ class EmailService {
           </div>
           
           <div style="background: #1e293b; padding: 1rem; text-align: center; color: white; font-size: 0.8rem;">
-            <p style="margin: 0;">© 2024 CivicConnect. All rights reserved.</p>
+            <p style="margin: 0;">© 2024 IntelliCivic. All rights reserved.</p>
           </div>
         </div>
       `
@@ -224,7 +224,7 @@ class EmailService {
           </div>
           
           <div style="background: #1e293b; padding: 1rem; text-align: center; color: white; font-size: 0.8rem;">
-            <p style="margin: 0;">© 2024 CivicConnect. All rights reserved.</p>
+            <p style="margin: 0;">© 2024 IntelliCivic. All rights reserved.</p>
           </div>
         </div>
       `
@@ -274,7 +274,7 @@ class EmailService {
           </div>
           
           <div style="background: #1e293b; padding: 1rem; text-align: center; color: white; font-size: 0.8rem;">
-            <p style="margin: 0;">© 2024 CivicConnect. All rights reserved.</p>
+            <p style="margin: 0;">© 2024 IntelliCivic. All rights reserved.</p>
           </div>
         </div>
       `

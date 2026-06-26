@@ -1,6 +1,6 @@
-# CivicConnect Backend API
+# IntelliCivic Backend API
 
-A comprehensive Node.js/Express backend for the CivicConnect civic issue reporting platform.
+A comprehensive Node.js/Express backend for the IntelliCivic civic issue reporting platform.
 
 ## 🚀 Features
 
@@ -55,7 +55,7 @@ A comprehensive Node.js/Express backend for the CivicConnect civic issue reporti
    NODE_ENV=development
    
    # Database
-   MONGODB_URI=mongodb://localhost:27017/civicconnect
+   MONGODB_URI=mongodb://localhost:27017/intellicivic
    
    # JWT
    JWT_SECRET=your-super-secret-jwt-key
@@ -145,7 +145,7 @@ http://localhost:5000/api
 |----------|-------------|---------|
 | `PORT` | Server port | 5000 |
 | `NODE_ENV` | Environment | development |
-| `MONGODB_URI` | MongoDB connection string | mongodb://localhost:27017/civicconnect |
+| `MONGODB_URI` | MongoDB connection string | mongodb://localhost:27017/intellicivic |
 | `JWT_SECRET` | JWT secret key | - |
 | `CLOUDINARY_CLOUD_NAME` | Cloudinary cloud name | - |
 | `SMTP_HOST` | SMTP server | smtp.gmail.com |
@@ -187,7 +187,7 @@ http://localhost:5000/api
    # ecosystem.config.js
    module.exports = {
      apps: [{
-       name: 'civicconnect-api',
+       name: 'intellicivic-api',
        script: 'server.js',
        instances: 'max',
        exec_mode: 'cluster',
@@ -219,8 +219,8 @@ http://localhost:5000/api
 
 2. **Build and run**
    ```bash
-   docker build -t civicconnect-api .
-   docker run -p 5000:5000 civicconnect-api
+   docker build -t intellicivic-api .
+   docker run -p 5000:5000 intellicivic-api
    ```
 
 ## 🧪 Testing
@@ -270,8 +270,8 @@ This project is licensed under the MIT License - see the [LICENSE](LICENSE) file
 
 ## 🆘 Support
 
-For support, email support@civicconnect.com or create an issue in the repository.
+For support, email support@intellicivic.com or create an issue in the repository.
 
 ---
 
-**CivicConnect Backend API** - Empowering communities through technology 🚀
+**IntelliCivic Backend API** - Empowering communities through technology 🚀

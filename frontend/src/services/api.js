@@ -12,7 +12,7 @@ class ApiService {
 
   // Helper method to get auth headers
   getAuthHeaders() {
-    const token = localStorage.getItem('civicconnect_token');
+    const token = localStorage.getItem('intellicivic_token');
     return {
       'Content-Type': 'application/json',
       ...(token && { Authorization: `Bearer ${token}` })
@@ -38,7 +38,7 @@ class ApiService {
     formData.append('image', file);
 
     const headers = {};
-    const token = localStorage.getItem('civicconnect_token');
+    const token = localStorage.getItem('intellicivic_token');
     if (token) {
       headers.Authorization = `Bearer ${token}`;
     }
@@ -372,7 +372,7 @@ class ApiService {
     }
 
     // Get auth token for headers (but don't set Content-Type - browser will set it with boundary)
-    const token = localStorage.getItem('civicconnect_token');
+    const token = localStorage.getItem('intellicivic_token');
     const headers = {};
     if (token) {
       headers['Authorization'] = `Bearer ${token}`;
@@ -491,6 +491,79 @@ class ApiService {
   async getMyProfile() {
     const response = await fetch(`${this.baseURL}/auth/profile`, {
       headers: this.getAuthHeaders()
+    });
+    return this.handleResponse(response);
+  }
+
+  // ================= GEMINI & ANALYTICS =================
+  async analyzeIssue(payload) {
+    const token = localStorage.getItem('intellicivic_token');
+    const response = await fetch(`${this.baseURL}/issues/analyze`, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        ...(token && { Authorization: `Bearer ${token}` })
+      },
+      body: JSON.stringify(payload)
+    });
+    return this.handleResponse(response);
+  }
+
+  async checkDuplicate(payload) {
+    const token = localStorage.getItem('intellicivic_token');
+    const response = await fetch(`${this.baseURL}/issues/check-duplicate`, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        ...(token && { Authorization: `Bearer ${token}` })
+      },
+      body: JSON.stringify(payload)
+    });
+    return this.handleResponse(response);
+  }
+
+  async verifyIssue(id, payload) {
+    const token = localStorage.getItem('intellicivic_token');
+    const response = await fetch(`${this.baseURL}/issues/${id}/verify`, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        ...(token && { Authorization: `Bearer ${token}` })
+      },
+      body: JSON.stringify(payload)
+    });
+    return this.handleResponse(response);
+  }
+
+  async getCivicInsights() {
+    const token = localStorage.getItem('intellicivic_token');
+    const response = await fetch(`${this.baseURL}/issues/analytics/civic-insights`, {
+      headers: {
+        'Content-Type': 'application/json',
+        ...(token && { Authorization: `Bearer ${token}` })
+      }
+    });
+    return this.handleResponse(response);
+  }
+
+  async getPredictiveInsights() {
+    const token = localStorage.getItem('intellicivic_token');
+    const response = await fetch(`${this.baseURL}/issues/analytics/predictive`, {
+      headers: {
+        'Content-Type': 'application/json',
+        ...(token && { Authorization: `Bearer ${token}` })
+      }
+    });
+    return this.handleResponse(response);
+  }
+
+  async getExecutiveGovernance() {
+    const token = localStorage.getItem('intellicivic_token');
+    const response = await fetch(`${this.baseURL}/issues/analytics/governance`, {
+      headers: {
+        'Content-Type': 'application/json',
+        ...(token && { Authorization: `Bearer ${token}` })
+      }
     });
     return this.handleResponse(response);
   }

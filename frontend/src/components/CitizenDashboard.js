@@ -183,8 +183,8 @@ const CitizenDashboard = ({ user, setUser }) => {
   }, [radiusKm, allIssues, userCenter]);
 
   const handleLogout = () => {
-    localStorage.removeItem('civicconnect_user');
-    localStorage.removeItem('civicconnect_token');
+    localStorage.removeItem('intellicivic_user');
+    localStorage.removeItem('intellicivic_token');
     setUser(null);
     navigate('/');
   };
@@ -195,7 +195,7 @@ const CitizenDashboard = ({ user, setUser }) => {
         <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', position: 'relative', zIndex: 1 }}>
           <div>
             <h1 className="dashboard-greeting">Hello, {user.name}!</h1>
-            <p className="dashboard-subtitle">Welcome back to CivicConnect</p>
+            <p className="dashboard-subtitle">Welcome back to IntelliCivic</p>
           </div>
           <button 
             onClick={handleLogout}

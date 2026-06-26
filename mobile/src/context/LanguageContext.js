@@ -4,7 +4,7 @@ export const LanguageContext = createContext();
 
 const languageData = {
   en: {
-    welcome: 'Welcome to CivicConnect',
+    welcome: 'Welcome to IntelliCivic',
     getStarted: 'Get Started',
     reportIssue: 'Report Issue',
     myReports: 'My Reports',
@@ -17,7 +17,7 @@ const languageData = {
     selectLanguage: 'Select Language'
   },
   hi: {
-    welcome: 'CivicConnect में आपका स्वागत है',
+    welcome: 'IntelliCivic में आपका स्वागत है',
     getStarted: 'शुरू करें',
     reportIssue: 'समस्या रिपोर्ट करें',
     myReports: 'मेरी रिपोर्ट्स',
@@ -30,7 +30,7 @@ const languageData = {
     selectLanguage: 'भाषा चुनें'
   },
   sat: {
-    welcome: 'CivicConnect ᱨᱮ ᱥᱟᱨᱦᱟᱣ',
+    welcome: 'IntelliCivic ᱨᱮ ᱥᱟᱨᱦᱟᱣ',
     getStarted: 'ᱮᱛᱦᱚᱵ ᱢᱮ',
     reportIssue: 'ᱵᱟᱝ ᱠᱟᱹᱢᱤ ᱠᱷᱚᱵᱚᱨ ᱢᱮ',
     myReports: 'ᱤᱧᱟᱜ ᱠᱷᱚᱵᱚᱨ ᱠᱚ',
@@ -43,7 +43,7 @@ const languageData = {
     selectLanguage: 'ᱯᱟᱹᱨᱥᱤ ᱵᱟᱪᱷᱟᱣ ᱢᱮ'
   },
   nag: {
-    welcome: 'CivicConnect में आपका स्वागत है',
+    welcome: 'IntelliCivic में आपका स्वागत है',
     getStarted: 'शुरू करें',
     reportIssue: 'समस्या रिपोर्ट करें',
     myReports: 'मेरी रिपोर्ट्स',

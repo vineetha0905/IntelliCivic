@@ -60,7 +60,7 @@ def test_without_image():
         "report_id": "test_text_001",
         "description": "park is filled with water in this location",
         "category": "Parks & Recreation",
-        "user_id": "test_user",
+        "user_id": "test_user_2",
         "image_url": None
     }
     

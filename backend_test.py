@@ -2,19 +2,25 @@ import requests
 import sys
 from datetime import datetime
 
-class CivicConnectAPITester:
-    def __init__(self, base_url="http://localhost:5000"):
+class IntelliCivicAPITester:
+    def __init__(self, base_url="http://localhost:5001"):
         self.base_url = base_url
         self.tests_run = 0
         self.tests_passed = 0
         self.admin_token = None
+        self.user_token = None
         self.test_user_id = None
         self.test_issue_id = None
 
     def run_test(self, name, method, endpoint, expected_status, data=None, params=None):
         """Run a single API test"""
-        url = f"{self.base_url}/{endpoint}"
+        url = f"{self.base_url}/{endpoint}" if endpoint else self.base_url
         headers = {'Content-Type': 'application/json'}
+        if "login" not in endpoint and "register" not in endpoint and "guest" not in endpoint:
+            if "admin" in endpoint and self.admin_token:
+                headers['Authorization'] = f"Bearer {self.admin_token}"
+            elif hasattr(self, 'user_token') and self.user_token:
+                headers['Authorization'] = f"Bearer {self.user_token}"
 
         self.tests_run += 1
         print(f"\n🔍 Testing {name}...")
@@ -28,7 +34,10 @@ class CivicConnectAPITester:
             elif method == 'PUT':
                 response = requests.put(url, json=data, headers=headers, timeout=10)
 
-            success = response.status_code == expected_status
+            if isinstance(expected_status, list):
+                success = response.status_code in expected_status
+            else:
+                success = response.status_code == expected_status
             if success:
                 self.tests_passed += 1
                 print(f"✅ Passed - Status: {response.status_code}")
@@ -53,18 +62,30 @@ class CivicConnectAPITester:
         print("=== Testing Authentication Endpoints ===")
         
         # Test admin login with correct credentials
-        success, response = self.run_test("Admin Login (Valid)", "POST", "api/auth/admin/login", 200, 
+        success, response = self.run_test("Admin Login (Valid)", "POST", "api/auth/admin-login", 200, 
                      {"username": "admin", "password": "admin123"})
-        if success and 'user' in response:
-            self.admin_token = response['user'].get('token')
+        if success and 'data' in response:
+            self.admin_token = response['data'].get('token')
         
         # Test admin login with invalid credentials
-        self.run_test("Admin Login (Invalid)", "POST", "api/auth/admin/login", 401, 
+        self.run_test("Admin Login (Invalid)", "POST", "api/auth/admin-login", 401, 
                      {"username": "admin", "password": "wrong"})
         
+        # Test register user
+        register_data = {
+            "name": "Test User",
+            "aadhaarNumber": "123456789012",
+            "mobile": "9876543210",
+            "address": "Test Address, Bhopal"
+        }
+        self.run_test("Register User", "POST", "api/auth/register", [201, 400], register_data)
+
         # Test send OTP with valid mobile
-        self.run_test("Send OTP (Valid)", "POST", "api/auth/send-otp", 200, 
+        success, response = self.run_test("Send OTP (Valid)", "POST", "api/auth/send-otp", 200, 
                      {"mobile": "9876543210"})
+        captured_otp = "123456"
+        if success and 'data' in response and 'otp' in response['data']:
+            captured_otp = response['data']['otp']
         
         # Test send OTP with invalid mobile
         self.run_test("Send OTP (Invalid)", "POST", "api/auth/send-otp", 400, 
@@ -72,9 +93,11 @@ class CivicConnectAPITester:
         
         # Test verify OTP with correct OTP
         success, response = self.run_test("Verify OTP (Valid)", "POST", "api/auth/verify-otp", 200, 
-                     {"mobile": "9876543210", "otp": "123456"})
-        if success and 'user' in response:
-            self.test_user_id = response['user'].get('id')
+                     {"mobile": "9876543210", "otp": captured_otp})
+        if success and 'data' in response:
+            self.user_token = response['data'].get('token')
+            if 'user' in response['data']:
+                self.test_user_id = response['data']['user'].get('id') or response['data']['user'].get('_id')
         
         # Test verify OTP with wrong OTP
         self.run_test("Verify OTP (Invalid)", "POST", "api/auth/verify-otp", 400, 
@@ -96,19 +119,31 @@ class CivicConnectAPITester:
         # Test get issues with category filter
         self.run_test("Get Issues (Category Filter)", "GET", "api/issues", 200, params={"category": "Street Lighting"})
         
-        # Test create issue with proper data format
+        import random
+        import time
+        ts = int(time.time())
+        rand_val = random.randint(1000, 9999)
+        # Jitter coordinates to avoid identical location duplicates
+        lat = 23.2599 + (random.random() * 0.04 - 0.02)
+        lon = 77.4126 + (random.random() * 0.04 - 0.02)
+        
         issue_data = {
-            "title": "Test Street Light Issue",
-            "description": "Street light not working in residential area",
+            "title": f"Test Street Light Issue {ts}",
+            "description": f"Street light not working in residential area at site {rand_val}",
             "category": "Street Lighting",
-            "location": "Test Location, Bhopal",
-            "coordinates": [23.2599, 77.4126],
+            "location": {
+                "name": "Test Location, Bhopal",
+                "coordinates": {
+                    "latitude": lat,
+                    "longitude": lon
+                }
+            },
             "user_id": self.test_user_id or "test_user_123",
             "reported_by": "Test User"
         }
         success, response = self.run_test("Create Issue", "POST", "api/issues", 201, issue_data)
-        if success and 'issue' in response:
-            self.test_issue_id = response['issue'].get('id')
+        if success and 'data' in response and 'issue' in response['data']:
+            self.test_issue_id = response['data']['issue'].get('_id') or response['data']['issue'].get('id')
         
         # Test get specific issue
         if self.test_issue_id:
@@ -181,22 +216,18 @@ class CivicConnectAPITester:
                      {"content": "test", "user_id": "test", "author": "test"})
 
     def test_basic_endpoints(self):
-        """Test the basic endpoints that exist in server.py"""
+        """Test the basic endpoints that exist in app.js"""
         print("=== Testing Basic Backend Endpoints ===")
         
         # Test root endpoint
-        self.run_test("Root Endpoint", "GET", "api/", 200)
+        self.run_test("Root Endpoint", "GET", "", 200)
         
-        # Test create status check
-        test_data = {"client_name": f"test_client_{datetime.now().strftime('%H%M%S')}"}
-        self.run_test("Create Status Check", "POST", "api/status", 200, test_data)
-        
-        # Test get status checks
-        self.run_test("Get Status Checks", "GET", "api/status", 200)
+        # Test health endpoint
+        self.run_test("Health Endpoint", "GET", "health", 200)
 
 def main():
-    print("🚀 Starting Comprehensive CivicConnect Backend API Tests")
-    tester = CivicConnectAPITester()
+    print("🚀 Starting Comprehensive IntelliCivic Backend API Tests")
+    tester = IntelliCivicAPITester()
     
     # Test basic endpoints first
     tester.test_basic_endpoints()

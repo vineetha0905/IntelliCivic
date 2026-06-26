@@ -33,9 +33,9 @@ function App() {
   useEffect(() => {
     const checkAuth = () => {
       try {
-        const savedUser = localStorage.getItem('civicconnect_user');
-        const savedAdmin = localStorage.getItem('civicconnect_admin');
-        const token = localStorage.getItem('civicconnect_token');
+        const savedUser = localStorage.getItem('intellicivic_user');
+        const savedAdmin = localStorage.getItem('intellicivic_admin');
+        const token = localStorage.getItem('intellicivic_token');
         
         if (savedAdmin) {
           const adminUser = JSON.parse(savedAdmin);
@@ -58,7 +58,7 @@ function App() {
 
   const languageData = {
     en: {
-      welcome: 'Welcome to CivicConnect',
+      welcome: 'Welcome to IntelliCivic',
       getStarted: 'Get Started',
       reportIssue: 'Report Issue',
       myReports: 'My Reports',
@@ -71,7 +71,7 @@ function App() {
       selectLanguage: 'Select Language'
     },
     hi: {
-      welcome: 'CivicConnect में आपका स्वागत है',
+      welcome: 'IntelliCivic में आपका स्वागत है',
       getStarted: 'शुरू करें',
       reportIssue: 'समस्या रिपोर्ट करें',
       myReports: 'मेरी रिपोर्ट्स',
@@ -84,20 +84,20 @@ function App() {
       selectLanguage: 'भाषा चुनें'
     },
     sat: {
-      welcome: 'CivicConnect ᱨᱮ ᱥᱟᱨᱦᱟᱣ',
+      welcome: 'IntelliCivic ᱨᱮ ᱥᱟᱨᱦᱟᱣ',
       getStarted: 'ᱮᱛᱦᱚᱵ ᱢᱮ',
       reportIssue: 'ᱵᱟᱝ ᱠᱟᱹᱢᱤ ᱠᱷᱚᱵᱚᱨ ᱢᱮ',
       myReports: 'ᱤᱧᱟᱜ ᱠᱷᱚᱵᱚᱨ ᱠᱚ',
       nearbyIssues: 'ᱥᱩᱨ ᱨᱮᱱᱟᱜ ᱵᱟᱝ ᱠᱟᱹᱢᱤ',
       login: 'ᱵᱚᱞᱚ ᱫᱚᱦᱚ',
-      register: 'ᱧᱩᱛᱩᱢ ᱚᱞ',
+      register: 'ᱧᱩᱛᱩム ᱚᱞ',
       adminLogin: 'ᱮᱰᱢᱤᱱ ᱵᱚᱞᱚ',
       dashboard: 'ᱰᱮᱥᱵᱚᱰ',
       hello: 'ᱡᱚᱦᱟᱨ, ᱛᱤᱱᱟᱹᱜ ᱫᱤᱱ ᱟᱢᱟᱜ ᱵᱟᱝ ᱠᱟᱹᱢᱤ ᱠᱷᱚᱵᱚᱨ ᱢᱮ!',
       selectLanguage: 'ᱯᱟᱹᱨᱥᱤ ᱵᱟᱪᱷᱟᱣ ᱢᱮ'
     },
     nag: {
-      welcome: 'CivicConnect में आपका स्वागत है',
+      welcome: 'IntelliCivic में आपका स्वागत है',
       getStarted: 'शुरू करीं',
       reportIssue: 'समस्या रिपोर्ट करीं',
       myReports: 'हमार रिपोर्ट सब',

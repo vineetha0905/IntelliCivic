@@ -20,7 +20,7 @@ const Welcome = () => {
     <div className="welcome-container">
       <div className="welcome-header">
         <h1 className="welcome-title">{t('welcome')}</h1>
-        <p className="welcome-subtitle">Report and track civic issues in your community</p>
+        <p className="welcome-subtitle">Community Hero, Hyperlocal Problem Solver</p>
       </div>
 
       <img src='./images/logo.png' style={{width:'300px',height:'300px'}}/>

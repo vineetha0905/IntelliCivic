@@ -1,6 +1,7 @@
 const Issue = require('../models/Issue');
 const User = require('../models/User');
 const notificationService = require('../services/notificationService');
+const geminiService = require('../services/geminiService');
 
 class EmployeeController {
   async listAssignedIssues(req, res) {
@@ -301,7 +302,7 @@ class EmployeeController {
   async resolveIssue(req, res) {
     try {
       const { id } = req.params;
-      const { latitude, longitude } = req.body;
+      const { latitude, longitude, technicalResolutionNote = 'Issue resolved' } = req.body;
 
       const issue = await Issue.findById(id).populate('reportedBy', '_id');
       if (!issue) {
@@ -411,11 +412,32 @@ class EmployeeController {
         });
       }
 
+      // Run AI resolution explainer
+      let explanation = technicalResolutionNote;
+      let summary = 'Issue resolved';
+      let impactStatement = 'The reported community issue is resolved.';
+
+      try {
+        const aiResolutionResult = await geminiService.explainResolution(technicalResolutionNote);
+        explanation = aiResolutionResult.explanation;
+        summary = aiResolutionResult.summary;
+        impactStatement = aiResolutionResult.impactStatement;
+      } catch (gemError) {
+        console.error('Gemini explanation of resolution failed:', gemError);
+      }
+
       // Update issue status to resolved and save (do NOT delete - keep visible for citizen)
       issue.resolvedAt = new Date();
       issue.status = 'resolved';
       issue.resolved = issue.resolved || {};
       issue.resolved.resolvedBy = req.user._id;
+      issue.aiResolution = {
+        explanation,
+        summary,
+        impactStatement,
+        technicalNote: technicalResolutionNote
+      };
+
       if (issue.createdAt) {
         issue.actualResolutionTime = Math.floor((issue.resolvedAt - issue.createdAt) / (1000 * 60 * 60 * 24));
       }

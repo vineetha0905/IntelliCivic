@@ -16,7 +16,7 @@ const Profile = () => {
       } catch (e) {
         // Fallback from local storage
         try {
-          const cached = JSON.parse(localStorage.getItem('civicconnect_user'));
+          const cached = JSON.parse(localStorage.getItem('intellicivic_user'));
           setProfile(cached || null);
         } catch (_) {}
         setError('Could not fetch profile from server');

@@ -21,7 +21,7 @@ class UploadController {
       if (isCloudinaryConfigured) {
         // Upload to Cloudinary
         const result = await cloudinary.uploader.upload(req.file.path, {
-          folder: 'civicconnect/images',
+          folder: 'intellicivic/images',
           resource_type: 'image',
           transformation: [
             { width: 1200, height: 1200, crop: 'limit', quality: 'auto' },
@@ -91,7 +91,7 @@ class UploadController {
       const uploadPromises = req.files.map(async (file) => {
         try {
           const result = await cloudinary.uploader.upload(file.path, {
-            folder: 'civicconnect/images',
+            folder: 'intellicivic/images',
             resource_type: 'image',
             transformation: [
               { width: 1200, height: 1200, crop: 'limit', quality: 'auto' },
@@ -164,7 +164,7 @@ class UploadController {
 
       // Upload to Cloudinary
       const result = await cloudinary.uploader.upload(req.file.path, {
-        folder: 'civicconnect/documents',
+        folder: 'intellicivic/documents',
         resource_type: 'raw'
       });
 
@@ -212,7 +212,7 @@ class UploadController {
         const imagePromises = images.map(async (file) => {
           try {
             const result = await cloudinary.uploader.upload(file.path, {
-              folder: 'civicconnect/images',
+              folder: 'intellicivic/images',
               resource_type: 'image',
               transformation: [
                 { width: 1200, height: 1200, crop: 'limit', quality: 'auto' },
@@ -246,7 +246,7 @@ class UploadController {
         const documentPromises = documents.map(async (file) => {
           try {
             const result = await cloudinary.uploader.upload(file.path, {
-              folder: 'civicconnect/documents',
+              folder: 'intellicivic/documents',
               resource_type: 'raw'
             });
 
@@ -422,7 +422,7 @@ class UploadController {
     try {
       const result = await cloudinary.api.resources({
         type: 'upload',
-        prefix: 'civicconnect/',
+        prefix: 'intellicivic/',
         max_results: 1000
       });
 

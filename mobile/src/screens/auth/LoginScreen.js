@@ -47,7 +47,7 @@ const LoginScreen = () => {
       <ScrollView contentContainerStyle={styles.scrollContent}>
         <View style={styles.header}>
           <Text style={styles.title}>Login</Text>
-          <Text style={styles.subtitle}>Welcome back to CivicConnect</Text>
+          <Text style={styles.subtitle}>Welcome back to IntelliCivic</Text>
         </View>
 
         <View style={styles.form}>

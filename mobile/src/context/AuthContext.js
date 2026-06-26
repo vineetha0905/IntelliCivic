@@ -14,9 +14,9 @@ export const AuthProvider = ({ children }) => {
 
   const checkAuth = async () => {
     try {
-      const savedUser = await AsyncStorage.getItem('civicconnect_user');
-      const savedAdmin = await AsyncStorage.getItem('civicconnect_admin');
-      const token = await AsyncStorage.getItem('civicconnect_token');
+      const savedUser = await AsyncStorage.getItem('intellicivic_user');
+      const savedAdmin = await AsyncStorage.getItem('intellicivic_admin');
+      const token = await AsyncStorage.getItem('intellicivic_token');
 
       if (savedAdmin) {
         const adminUser = JSON.parse(savedAdmin);
@@ -37,12 +37,12 @@ export const AuthProvider = ({ children }) => {
   const login = async (userData, admin = false) => {
     try {
       if (admin) {
-        await AsyncStorage.setItem('civicconnect_admin', JSON.stringify(userData));
-        await AsyncStorage.setItem('civicconnect_token', userData.token || '');
+        await AsyncStorage.setItem('intellicivic_admin', JSON.stringify(userData));
+        await AsyncStorage.setItem('intellicivic_token', userData.token || '');
         setIsAdmin(true);
       } else {
-        await AsyncStorage.setItem('civicconnect_user', JSON.stringify(userData));
-        await AsyncStorage.setItem('civicconnect_token', userData.token || '');
+        await AsyncStorage.setItem('intellicivic_user', JSON.stringify(userData));
+        await AsyncStorage.setItem('intellicivic_token', userData.token || '');
         setIsAdmin(false);
       }
       setUser(userData);
@@ -54,9 +54,9 @@ export const AuthProvider = ({ children }) => {
   const logout = async () => {
     try {
       await AsyncStorage.multiRemove([
-        'civicconnect_user',
-        'civicconnect_admin',
-        'civicconnect_token'
+        'intellicivic_user',
+        'intellicivic_admin',
+        'intellicivic_token'
       ]);
       setUser(null);
       setIsAdmin(false);

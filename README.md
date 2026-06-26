@@ -1,4 +1,4 @@
-# CivicConnect – Implementation Flow (Non-Technical)
+# IntelliCivic – Implementation Flow (Non-Technical)
 
 This section explains, in simple terms, how the whole system works for citizens and admins.
 

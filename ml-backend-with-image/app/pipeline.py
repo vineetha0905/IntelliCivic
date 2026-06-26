@@ -4,7 +4,8 @@ from app.text_rules import (
     is_abusive,
     detect_category,
     detect_urgency,
-    CATEGORY_KEYWORDS
+    CATEGORY_KEYWORDS,
+    contains
 )
 
 # Confidence threshold for category detection
@@ -84,6 +85,8 @@ GENERIC_IMAGE_LABELS = {
 # ------------------------------------
 # Model initialization
 # ------------------------------------
+import re
+
 def initialize_models():
     """Initialize ML models (CLIP for image classification)"""
     try:
@@ -93,39 +96,178 @@ def initialize_models():
         pass
 
 
+# Category normalizer mapping various frontend forms to standard keys
+def normalize_category(cat: str) -> str:
+    if not cat:
+        return "Other"
+    cat_lower = cat.lower().replace("&", "and").replace(" ", "").replace("-", "")
+    
+    # Mapping various forms to standard ML categories
+    if "road" in cat_lower or "traffic" in cat_lower:
+        return "Road & Traffic"
+    if "garbage" in cat_lower or "sanitation" in cat_lower or "trash" in cat_lower:
+        return "Garbage & Sanitation"
+    if "streetlight" in cat_lower or "streetlamp" in cat_lower or "lamp" in cat_lower or "light" in cat_lower:
+        return "Street Lighting"
+    if "water" in cat_lower or "drain" in cat_lower or "sewage" in cat_lower or "leak" in cat_lower:
+        return "Water & Drainage"
+    if "park" in cat_lower or "recreation" in cat_lower or "garden" in cat_lower:
+        return "Parks & Recreation"
+    if "safety" in cat_lower or "hazard" in cat_lower or "fire" in cat_lower or "crime" in cat_lower:
+        return "Public Safety"
+    if "electr" in cat_lower or "power" in cat_lower:
+        return "Electricity"
+    
+    # Exact/partial mappings
+    for standard_cat in ["Road & Traffic", "Garbage & Sanitation", "Street Lighting", "Water & Drainage", "Parks & Recreation", "Public Safety", "Electricity"]:
+        std_lower = standard_cat.lower().replace("&", "and").replace(" ", "")
+        if std_lower in cat_lower or cat_lower in std_lower:
+            return standard_cat
+            
+    return "Other"
+
+
+def image_matches_category_label(image_label: str, category: str) -> bool:
+    """
+    Returns True if the classified image label is compatible with the given category.
+    """
+    image_label = image_label.lower().strip()
+    
+    # Get allowed labels and keywords for this category
+    allowed_labels = [lbl.lower() for lbl in IMAGE_TO_CATEGORY_MAP.get(category, [])]
+    category_keywords = [kw.lower() for kw in CATEGORY_KEYWORDS.get(category, [])]
+
+    # Direct exact match
+    if image_label in allowed_labels:
+        return True
+
+    # Substring match
+    for lbl in allowed_labels:
+        if lbl in image_label or image_label in lbl:
+            return True
+
+    # Category keywords match
+    for kw in category_keywords:
+        if kw in image_label or image_label in kw:
+            return True
+
+    # Word-level matching
+    image_words = set(image_label.split())
+    for lbl in allowed_labels:
+        lbl_words = set(lbl.split())
+        common_words = image_words.intersection(lbl_words)
+        if common_words:
+            return True
+
+    for word in image_words:
+        if len(word) > 2:
+            for kw in category_keywords:
+                if word in kw or kw in word:
+                    return True
+            for lbl in allowed_labels:
+                if word in lbl or lbl in word:
+                    return True
+
+    return False
+
+
+def is_spam_description(desc: str) -> bool:
+    desc_clean = desc.strip().lower()
+    if not desc_clean or len(desc_clean) < 10:
+        return True
+    
+    # Check for repeated characters like "aaaaaaa" or "123123123"
+    if re.match(r'^([a-zA-Z0-9])\1+$', desc_clean):
+        return True
+
+    # Check for repeated sequences of length >= 1 (e.g. 123123123)
+    # Check if string has very low unique characters count
+    unique_chars = set(desc_clean.replace(" ", ""))
+    if len(unique_chars) <= 3 and len(desc_clean.replace(" ", "")) >= 6:
+        return True
+    
+    # Check if there are no vowels in alphabetical words (helps catch "asdfghjkl", "qwrtypsdfg")
+    words = [w for w in desc_clean.split() if w.isalpha()]
+    if words:
+        all_words_no_vowels = all(len(w) > 3 and not any(v in w for v in 'aeiou') for w in words)
+        if all_words_no_vowels:
+            return True
+            
+    # Repeated words check (e.g. "test test test")
+    all_words = desc_clean.split()
+    if len(all_words) >= 3:
+        if len(set(all_words)) == 1:
+            return True
+        if len(set(all_words)) / len(all_words) < 0.3:
+            return True
+            
+    return False
+
+
 # ------------------------------------
-# Main pipeline (OPTIMIZED)
+# Main pipeline (OPTIMIZED & STRICT)
 # ------------------------------------
 def classify_report(report: dict):
     try:
         description = (report.get("description") or "").strip()
-        if not description:
-            return reject(report, "Description is required", confidence=0.0)
+        selected_cat_raw = report.get("category")
+        selected_cat = normalize_category(selected_cat_raw) if selected_cat_raw else None
 
-        # Category detection with confidence scoring
+        # 1. Spam & Meaningless Description Detection
+        if is_spam_description(description):
+            return reject(report, "Invalid or spam description.", confidence=0.0)
+
+        # 2. Abusive Language check
+        if is_abusive(description):
+            return reject(
+                report,
+                "Abusive language detected. Please remove inappropriate words before submitting your complaint.",
+                confidence=0.0,
+                validation="profanity_detected"
+            )
+
+        # 3. Description Category match
         try:
             category, confidence = detect_category(description)
         except Exception as e:
-            print(f"[ERROR] Category detection failed: {str(e)}")
-            import traceback
-            print(traceback.format_exc())
-            return reject(report, f"Category detection error: {str(e)}", "Other", 0.0)
-        
-        # Reject if category is "Other" or confidence is below threshold
+            return reject(report, "Unable to verify uploaded image.", "Other", 0.0)
+
+        # If description doesn't resolve to a valid category, reject
         if category == "Other" or confidence < CATEGORY_CONFIDENCE_THRESHOLD:
-            return reject(report, "Unable to determine issue category. Please provide more details.", category, confidence)
+            return reject(report, "Invalid or spam description.", category, confidence)
 
-        if is_abusive(description):
-            return reject(report, "Abusive language detected", category, confidence)
+        # If selected category is provided, check description matches selected category
+        if selected_cat and selected_cat != "Other":
+            pred_cat_norm = normalize_category(category)
+            if pred_cat_norm != selected_cat:
+                selected_keywords = CATEGORY_KEYWORDS.get(selected_cat, [])
+                description_clean = description.lower()
+                has_selected_keyword = any(contains(description_clean, kw) for kw in selected_keywords)
+                if not has_selected_keyword:
+                    if report.get("image_bytes"):
+                        return reject(
+                            report,
+                            "Image does not match the selected category, issue title, or complaint description.",
+                            category,
+                            confidence,
+                            validation="image_content_mismatch"
+                        )
+                    else:
+                        return reject(
+                            report,
+                            "Category mismatch between description and selected category.",
+                            category,
+                            confidence,
+                            validation="category_mismatch"
+                        )
 
-        # Check for same user duplicate (same user, same description, same category)
+        # 4. Duplicate Checks (same user, description, category)
         user_id = report.get("user_id", "anon")
         try:
             if storage.is_duplicate(user_id, description, category, store=False):
-                return reject(report, "You have already submitted this report.", category, confidence)
+                return reject(report, "Duplicate report detected.", category, confidence)
         except Exception as e:
             print(f"[ERROR] Text duplicate check failed: {str(e)}")
-            # Continue - don't block on technical errors
 
         # Check for location-based duplicate (same category within 10 meters)
         latitude = report.get("latitude")
@@ -133,70 +275,68 @@ def classify_report(report: dict):
         if latitude is not None and longitude is not None:
             try:
                 if storage.is_duplicate_location(latitude, longitude, description, category, threshold=10.0, store=False):
-                    return reject(report, "A similar issue has already been reported at this location.", category, confidence)
+                    return reject(report, "Duplicate report detected.", category, confidence)
             except Exception as e:
                 print(f"[ERROR] Location duplicate check failed: {str(e)}")
-                # Continue - don't block on technical errors
 
-        # STEP 1: Check image against detected category FIRST (BEFORE duplicate check)
-        image_bytes = report.get("image_bytes")  # Changed from image_url to image_bytes
+        # 5. Image validations
+        image_bytes = report.get("image_bytes")
         if image_bytes:
-            print(f"[DEBUG] Processing image for category '{category}' (image size: {len(image_bytes)} bytes)")
-            
             try:
-                # CRITICAL: Validate image matches category FIRST
-                # If image doesn't match, reject immediately - don't check duplicates
-                image_matches = image_matches_category_from_bytes(image_bytes, category)
+                # Classify image
+                image_label = ic.classify_image_from_bytes(image_bytes)
+                image_label = str(image_label).lower().strip() if image_label else "other"
                 
-                if not image_matches:
-                    # Image doesn't match category - reject immediately
-                    print(f"[DEBUG] Image does NOT match category '{category}' - rejecting without duplicate check")
+                # Check if image classification is empty or generic/unidentified
+                if not image_label or image_label == "other" or image_label in GENERIC_IMAGE_LABELS:
+                    return reject(report, "Unable to verify uploaded image.", category, confidence)
+                
+                # Check if image category matches selected category
+                image_matches_selected = False
+                if selected_cat and selected_cat != "Other":
+                    image_matches_selected = image_matches_category_label(image_label, selected_cat)
+                else:
+                    image_matches_selected = True # No category selected
+                
+                # Check if image category matches predicted category
+                image_matches_predicted = image_matches_category_label(image_label, category)
+
+                # Check if image category matches title category
+                title = report.get("title", "")
+                image_matches_title = True
+                if title:
+                    title_cat, _ = detect_category(title)
+                    if title_cat != "Other":
+                        image_matches_title = image_matches_category_label(image_label, title_cat)
+
+                if not image_matches_selected or not image_matches_predicted or not image_matches_title:
                     return reject(
                         report,
-                        "Image does not match the issue description. Please provide an image related to the reported category.",
+                        "Image does not match the selected category, issue title, or complaint description.",
                         category,
-                        confidence
+                        confidence,
+                        validation="image_content_mismatch"
                     )
-                
-                print(f"[DEBUG] Image matches category '{category}' - proceeding to duplicate check")
-                
-                # STEP 2: Only check for duplicates if image matches category
-                try:
-                    # Check for duplicates with threshold=0 (EXACT match only - most strict)
-                    print(f"[DEBUG] Checking for duplicate image")
-                    is_dup = storage.is_duplicate_image_from_bytes(image_bytes, threshold=0, store=False)
-                    
-                    if is_dup:
-                        print(f"[DEBUG] DUPLICATE DETECTED")
-                        return reject(report, "Duplicate image detected. This image has already been used in another report.", category, confidence)
-                    
-                    print(f"[DEBUG] Image is NOT duplicate - will be stored in dataset after acceptance")
-                    # Image hash will be stored in dataset when report is saved
-                except Exception as e:
-                    # If duplicate check fails, allow submission (don't block on technical errors)
-                    print(f"[ERROR] Duplicate check failed (allowing submission): {str(e)}")
-                    import traceback
-                    print(traceback.format_exc())
-                    # Continue - don't block legitimate reports due to technical issues
+
+                # Check duplicate images
+                if storage.is_duplicate_image_from_bytes(image_bytes, threshold=0, store=False):
+                    return reject(report, "Duplicate report detected.", category, confidence)
+
             except Exception as e:
-                print(f"[ERROR] Image validation failed: {str(e)}")
-                import traceback
-                print(traceback.format_exc())
-                # If image validation fails, reject the report
-                return reject(report, f"Image validation error: {str(e)}", category, confidence)
+                print(f"[ERROR] Image classification failed: {str(e)}")
+                return reject(report, "Unable to verify uploaded image.", category, confidence)
 
         urgency = detect_urgency(description)
         
-        # Prepare result with all necessary data for duplicate checking
+        # Prepare result
         result = {
             "report_id": report.get("report_id", "unknown"),
             "accept": True,
             "status": "accepted",
             "category": category,
-            "confidence": round(confidence, 2),  # Add confidence to response
+            "confidence": round(confidence, 2),
             "urgency": urgency,
             "reason": "Report accepted successfully",
-            # Store data needed for duplicate checking
             "user_id": user_id,
             "description": description,
             "latitude": latitude,
@@ -204,7 +344,6 @@ def classify_report(report: dict):
         }
         
         # Compute and store image hash if image is provided
-        image_bytes = report.get("image_bytes")
         if image_bytes:
             try:
                 from PIL import Image
@@ -212,34 +351,26 @@ def classify_report(report: dict):
                 import io
                 img = Image.open(io.BytesIO(image_bytes)).convert('RGB')
                 img_hash = imagehash.phash(img)
-                result["image_hash"] = str(img_hash)  # Store as string for JSON serialization
+                result["image_hash"] = str(img_hash)
             except Exception as e:
                 print(f"[WARNING] Failed to compute image hash (non-critical): {str(e)}")
-                # Continue without image hash
 
-        # Save to dataset (this is how we "store" for future duplicate checks)
-        # Remove image_bytes from report data before saving (can't serialize bytes to JSON)
+        # Save to dataset
         report_for_save = {**report, **result}
         if "image_bytes" in report_for_save:
-            # Remove image_bytes - we only need image_hash for duplicate checking
             del report_for_save["image_bytes"]
         
         try:
             dataset.save_report(report_for_save)
             print(f"[DEBUG] Successfully saved accepted report to dataset")
         except Exception as e:
-            print(f"[ERROR] Failed to save report to dataset (non-critical): {str(e)}")
-            import traceback
-            print(traceback.format_exc())
-            # Continue - dataset save failure shouldn't block acceptance
+            print(f"[ERROR] Failed to save report to dataset: {str(e)}")
         
         return result
 
     except Exception as e:
         print(f"[ERROR] Critical error in classify_report: {str(e)}")
-        import traceback
-        print(traceback.format_exc())
-        return reject(report, f"Processing error: {str(e)}", confidence=0.0)
+        return reject(report, "Unable to verify uploaded image.", confidence=0.0)
 
 
 # ------------------------------------
@@ -327,15 +458,18 @@ def image_matches_category_from_bytes(image_bytes: bytes, category: str) -> bool
 # ------------------------------------
 # Reject helper
 # ------------------------------------
-def reject(report, reason, category="Other", confidence=0.0):
+def reject(report, reason, category="Other", confidence=0.0, validation=None):
     result = {
         "report_id": report.get("report_id", "unknown"),
         "accept": False,
+        "accepted": False,
         "status": "rejected",
         "category": category,
         "confidence": round(confidence, 2),  # Include confidence in rejection
         "reason": reason
     }
+    if validation:
+        result["validation"] = validation
     # Remove image_bytes from report data before saving (can't serialize bytes to JSON)
     report_for_save = {**report, **result}
     if "image_bytes" in report_for_save:

@@ -13,41 +13,41 @@ def test_profanity_detection():
     print("🧪 Testing Profanity Detection")
     print("=" * 60)
     
-    # Test cases: (description, should_be_rejected, test_name)
+    # Test cases: (description, should_be_rejected, test_name, category)
     test_cases = [
         # Abusive language - should be rejected
-        ("This is a fucking pothole that needs fixing", True, "Explicit profanity"),
-        ("What the hell is wrong with this road", True, "Mild profanity"),
-        ("This shit needs to be fixed immediately", True, "Strong profanity"),
-        ("You're an idiot for not fixing this", True, "Insult"),
-        ("This is crap and needs attention", True, "Mild profanity"),
+        ("This is a fucking pothole that needs fixing", True, "Explicit profanity", "Road & Traffic"),
+        ("What the hell is wrong with this road", True, "Mild profanity", "Road & Traffic"),
+        ("This shit needs to be fixed immediately", True, "Strong profanity", "Road & Traffic"),
+        ("You're an idiot for not fixing this", True, "Insult", "Road & Traffic"),
+        ("This is crap and needs attention", True, "Mild profanity", "Road & Traffic"),
         
         # Clean language - should be accepted
-        ("There is a large pothole on Main Street that needs repair", False, "Clean description"),
-        ("The street light is not working properly", False, "Clean technical issue"),
-        ("Water is leaking from the pipe", False, "Clean water issue"),
-        ("Garbage is overflowing from the bin", False, "Clean sanitation issue"),
-        ("Park maintenance is needed", False, "Clean maintenance request"),
+        ("There is a large pothole on Main Street that needs repair", False, "Clean description", "Road & Traffic"),
+        ("The street light is not working properly", False, "Clean technical issue", "Street Lighting"),
+        ("Water is leaking from the pipe", False, "Clean water issue", "Water & Drainage"),
+        ("Garbage is overflowing from the bin", False, "Clean sanitation issue", "Garbage & Sanitation"),
+        ("Park maintenance is needed", False, "Clean maintenance request", "Parks & Recreation"),
         
         # Edge cases
-        ("FUCK this pothole", True, "All caps profanity"),
-        ("fuck this pothole", True, "Lowercase profanity"),
-        ("F*ck this pothole", False, "Censored profanity (might pass)"),
-        ("This is a damn good road", True, "Profanity in positive context"),
+        ("FUCK this pothole", True, "All caps profanity", "Road & Traffic"),
+        ("fuck this pothole", True, "Lowercase profanity", "Road & Traffic"),
+        ("F*ck this pothole", False, "Censored profanity (might pass)", "Road & Traffic"),
+        ("This is a damn good road", True, "Profanity in positive context", "Road & Traffic"),
     ]
     
     passed = 0
     failed = 0
     
-    for desc, should_reject, test_name in test_cases:
+    for idx, (desc, should_reject, test_name, cat) in enumerate(test_cases):
         report = {
-            "report_id": f"test_{test_name.replace(' ', '_').lower()}",
+            "report_id": f"test_{test_name.replace(' ', '_').lower()}_{idx}",
             "description": desc,
-            "category": "Road & Traffic",
-            "user_id": "test_user",
+            "category": cat,
+            "user_id": f"test_user_{idx}",
             "image_url": None,
-            "latitude": 12.9,
-            "longitude": 77.6
+            "latitude": 12.9 + idx * 0.01,
+            "longitude": 77.6 + idx * 0.01
         }
         
         result = classify_report(report)

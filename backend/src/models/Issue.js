@@ -17,13 +17,14 @@ const issueSchema = new mongoose.Schema({
     type: String,
     required: [true, 'Category is required'],
     enum: [
-      'Road & Traffic',
-      'Water & Drainage', 
-      'Electricity',
+      'Road Damage',
+      'Water Leakage',
       'Garbage & Sanitation',
-      'Street Lighting',
-      'Public Safety',
-      'Parks & Recreation',
+      'Streetlight Failure',
+      'Drainage Issue',
+      'Traffic Issue',
+      'Public Infrastructure',
+      'Environmental Hazard',
       'Other'
     ]
   },
@@ -61,7 +62,7 @@ const issueSchema = new mongoose.Schema({
   },
   priority: {
     type: String,
-    enum: ['low', 'medium', 'high', 'urgent'],
+    enum: ['low', 'medium', 'high', 'urgent', 'critical'],
     default: 'medium'
   },
   reportedBy: {
@@ -242,6 +243,46 @@ const issueSchema = new mongoose.Schema({
   reportId: {
     type: String,
     default: null
+  },
+  aiAnalysis: {
+    category: String,
+    priority: String,
+    department: String,
+    summary: String,
+    recommendedAction: String,
+    urgencyReason: String
+  },
+  verifications: [{
+    user: {
+      type: mongoose.Schema.Types.ObjectId,
+      ref: 'User'
+    },
+    status: {
+      type: String,
+      enum: ['verified', 'rejected']
+    },
+    comment: String,
+    evidenceUrl: String,
+    confidenceScore: Number,
+    createdAt: {
+      type: Date,
+      default: Date.now
+    }
+  }],
+  verificationSummary: {
+    status: String,
+    summary: String,
+    confidenceScore: {
+      type: Number,
+      default: 0
+    },
+    updatedAt: Date
+  },
+  aiResolution: {
+    explanation: String,
+    summary: String,
+    impactStatement: String,
+    technicalNote: String
   }
 }, {
   timestamps: true

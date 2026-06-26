@@ -62,22 +62,38 @@ const Leaderboard = ({ hideBackButton = false }) => {
         <p style={{ color: '#64748b', marginBottom: '1.5rem', lineHeight: '1.6' }}>
           Top contributors ranked by total contribution score. Earn points by reporting issues, supporting issues, and having your issues resolved.
         </p>
-        
-        {/* Points Breakdown */}
+               {/* Points Breakdown */}
         <div style={{ 
           background: '#f8fafc', 
-          padding: '1rem', 
+          padding: '1.25rem', 
           borderRadius: 12, 
           marginBottom: '1.5rem',
           border: '1px solid #e2e8f0'
         }}>
-          <div style={{ fontSize: '0.9rem', fontWeight: '600', color: '#1e293b', marginBottom: '0.5rem' }}>
-            How to Earn Points:
+          <div style={{ fontSize: '0.9rem', fontWeight: '700', color: '#1e293b', marginBottom: '0.5rem' }}>
+            Contribution Point System:
           </div>
-          <div style={{ fontSize: '0.85rem', color: '#64748b', display: 'flex', flexDirection: 'column', gap: '0.25rem' }}>
-            <span>• Report an issue: <strong>+5 points</strong></span>
-            <span>• Upvote/support an issue: <strong>+1 point</strong></span>
-            <span>• Your issue gets resolved: <strong>+10 points</strong></span>
+          <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '0.75rem', fontSize: '0.825rem', color: '#475569' }}>
+            <div>
+              <strong>Earn Points:</strong>
+              <div style={{ display: 'flex', flexDirection: 'column', gap: '0.25rem', marginTop: '0.25rem' }}>
+                <span>• Report Issue: <strong>+10 pts</strong></span>
+                <span>• Verify Issue: <strong>+5 pts</strong></span>
+                <span>• Support Issue: <strong>+3 pts</strong></span>
+                <span>• Consensus validation: <strong>+5 pts</strong></span>
+                <span>• Confirmed Resolution: <strong>+10 pts</strong></span>
+              </div>
+            </div>
+            <div>
+              <strong>Badges & Levels:</strong>
+              <div style={{ display: 'flex', flexDirection: 'column', gap: '0.25rem', marginTop: '0.25rem' }}>
+                <span>🌱 Novice: <strong>&lt; 10 pts</strong></span>
+                <span>🤝 Community Helper: <strong>10 pts</strong></span>
+                <span>🏆 Civic Champion: <strong>50 pts</strong></span>
+                <span>🛡️ Civic Guardian: <strong>100 pts</strong></span>
+                <span>🦸 Community Hero: <strong>200+ pts</strong></span>
+              </div>
+            </div>
           </div>
         </div>
         
@@ -93,8 +109,22 @@ const Leaderboard = ({ hideBackButton = false }) => {
             <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
               <div>
                 <div style={{ fontSize: '0.9rem', color: '#64748b', marginBottom: '0.25rem' }}>Your Rank</div>
-                <div style={{ fontSize: '1.5rem', fontWeight: 'bold', color: '#1e293b' }}>
-                  #{currentUser.rank}
+                <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
+                  <span style={{ fontSize: '1.5rem', fontWeight: 'bold', color: '#1e293b' }}>
+                    #{currentUser.rank}
+                  </span>
+                  {(() => {
+                    const badge = currentUser.points >= 200 ? { label: 'Community Hero', icon: '🦸' } :
+                                  currentUser.points >= 100 ? { label: 'Civic Guardian', icon: '🛡️' } :
+                                  currentUser.points >= 50 ? { label: 'Civic Champion', icon: '🏆' } :
+                                  currentUser.points >= 10 ? { label: 'Community Helper', icon: '🤝' } :
+                                  { label: 'Novice', icon: '🌱' };
+                    return (
+                      <span style={{ fontSize: '0.8rem', background: 'white', padding: '0.2rem 0.5rem', borderRadius: '6px', fontWeight: '600' }}>
+                        {badge.icon} {badge.label}
+                      </span>
+                    );
+                  })()}
                 </div>
               </div>
               <div style={{ textAlign: 'right' }}>
@@ -133,6 +163,13 @@ const Leaderboard = ({ hideBackButton = false }) => {
             {displayEntries.map((e, index) => {
               // Use index as fallback key if rank is duplicated
               const uniqueKey = `${e.rank}-${e.name}-${index}`;
+              const pointsVal = e.points || 0;
+              const badge = pointsVal >= 200 ? { label: 'Community Hero', color: '#dc2626', bg: '#fef2f2', icon: '🦸' } :
+                            pointsVal >= 100 ? { label: 'Civic Guardian', color: '#2563eb', bg: '#eff6ff', icon: '🛡️' } :
+                            pointsVal >= 50 ? { label: 'Civic Champion', color: '#d97706', bg: '#fef3c7', icon: '🏆' } :
+                            pointsVal >= 10 ? { label: 'Community Helper', color: '#16a34a', bg: '#f0fdf4', icon: '🤝' } :
+                            { label: 'Novice', color: '#64748b', bg: '#f1f5f9', icon: '🌱' };
+              
               return (
                 <div 
                   key={uniqueKey}
@@ -155,11 +192,28 @@ const Leaderboard = ({ hideBackButton = false }) => {
                     }}>
                       {index === 0 ? '🥇' : index === 1 ? '🥈' : index === 2 ? '🥉' : `${e.rank}.`}
                     </span>
-                    <span style={{ color: '#1e293b', fontWeight: e.isCurrentUser ? '600' : '400' }}>
-                      {e.isCurrentUser ? 'You' : e.name || 'Unknown'}
-                    </span>
+                    <div style={{ display: 'flex', flexDirection: 'column' }}>
+                      <span style={{ color: '#1e293b', fontWeight: e.isCurrentUser ? '600' : '500' }}>
+                        {e.isCurrentUser ? `${e.name || 'You'} (You)` : e.name || 'Unknown'}
+                      </span>
+                      <span style={{
+                        fontSize: '0.7rem',
+                        fontWeight: '700',
+                        color: badge.color,
+                        background: badge.bg,
+                        padding: '0.1rem 0.4rem',
+                        borderRadius: '4px',
+                        marginTop: '0.15rem',
+                        width: 'fit-content',
+                        display: 'flex',
+                        alignItems: 'center',
+                        gap: '0.15rem'
+                      }}>
+                        {badge.icon} {badge.label}
+                      </span>
+                    </div>
                   </div>
-                  <strong style={{ color: '#1e293b', fontSize: '1rem' }}>{e.points || 0} pts</strong>
+                  <strong style={{ color: '#1e293b', fontSize: '1rem' }}>{pointsVal} pts</strong>
                 </div>
               );
             })}

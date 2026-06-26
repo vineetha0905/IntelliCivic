@@ -50,13 +50,14 @@ const userSchema = new mongoose.Schema({
   department: {
   	type: String,
   	enum: [
-  	  'Road & Traffic',
-  	  'Water & Drainage',
-  	  'Electricity',
+  	  'Road Damage',
+  	  'Water Leakage',
   	  'Garbage & Sanitation',
-  	  'Street Lighting',
-  	  'Public Safety',
-  	  'Parks & Recreation',
+  	  'Streetlight Failure',
+  	  'Drainage Issue',
+  	  'Traffic Issue',
+  	  'Public Infrastructure',
+  	  'Environmental Hazard',
   	  'All',
   	  'Other'
   	],
@@ -65,13 +66,14 @@ const userSchema = new mongoose.Schema({
   departments: [{
   	type: String,
   	enum: [
-  	  'Road & Traffic',
-  	  'Water & Drainage',
-  	  'Electricity',
+  	  'Road Damage',
+  	  'Water Leakage',
   	  'Garbage & Sanitation',
-  	  'Street Lighting',
-  	  'Public Safety',
-  	  'Parks & Recreation',
+  	  'Streetlight Failure',
+  	  'Drainage Issue',
+  	  'Traffic Issue',
+  	  'Public Infrastructure',
+  	  'Environmental Hazard',
   	  'All',
   	  'Other'
   	]

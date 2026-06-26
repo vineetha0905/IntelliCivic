@@ -27,8 +27,8 @@ const EmployeeProfile = ({ user, setUser }) => {
   };
 
   const handleLogout = () => {
-    localStorage.removeItem('civicconnect_token');
-    localStorage.removeItem('civicconnect_user');
+    localStorage.removeItem('intellicivic_token');
+    localStorage.removeItem('intellicivic_user');
     setUser && setUser(null);
     navigate('/employee-login');
   };
